@@ -1,4 +1,4 @@
-<div class="messages-container animate-slide-up">
+<div class="messages-container">
     <div class="messages-header">
         <a href="<?= $baseUrl ?>/profile/view/<?= $recipient['id'] ?>" class="btn-back">
             <i class="fa fa-arrow-left"></i> Retour

@@ -2,8 +2,8 @@
 class MessageController extends BaseController {
     public function __construct() {
         parent::__construct();
-        // Ajouter CSS spécifique pour les messages
-        $this->addCss('/assets/css/messages.css');
+        $this->addCss('/css/messages.css');
+        $this->addCss('/css/utilities.css');
     }
     
     public function handleRequest() {

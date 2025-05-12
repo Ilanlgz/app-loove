@@ -11,6 +11,9 @@
             <link rel="stylesheet" href="<?php echo htmlspecialchars($cssFile); ?>">
         <?php endforeach; ?>
     <?php endif; ?>
+    <link rel="stylesheet" href="<?= $baseUrl ?>/css/style.css">
+    <link rel="stylesheet" href="<?= $baseUrl ?>/css/messages.css">
+    <link rel="stylesheet" href="<?= $baseUrl ?>/css/utilities.css">
 </head>
 <body>
     <header>
