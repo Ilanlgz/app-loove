@@ -1,0 +1,56 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>CSS Test</title>
+    
+    <!-- Try different CSS paths -->
+    <link rel="stylesheet" href="css/style.css">
+    <link rel="stylesheet" href="/loove/app-loove/public/css/style.css">
+    
+    <style>
+        /* Fallback styling */
+        body {
+            font-family: Arial, sans-serif;
+            line-height: 1.6;
+            margin: 20px;
+        }
+        
+        .test-container {
+            border: 2px solid #333;
+            padding: 20px;
+            margin-top: 20px;
+        }
+        
+        .test-box {
+            background-color: #f5f5f5;
+            padding: 15px;
+            margin-top: 15px;
+            border: 1px solid #ddd;
+        }
+        
+        h1 {
+            color: #333;
+        }
+    </style>
+</head>
+<body>
+    <div class="test-container">
+        <h1>CSS Test Page</h1>
+        <p>This page tests if CSS files are loading correctly.</p>
+        
+        <div class="test-box">
+            <h2>CSS Loading Test</h2>
+            <p>If the external CSS is working:</p>
+            <ul>
+                <li>This page should have a light blue background (#f0f2f5)</li>
+                <li>Headers should be pink (#ff6b81)</li>
+                <li>This test box should have a white background</li>
+            </ul>
+        </div>
+        
+        <button class="btn btn-primary">Test Button</button>
+    </div>
+</body>
+</html>
