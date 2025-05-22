@@ -104,20 +104,30 @@ if (preg_match('/\.(css|js|jpg|jpeg|png|gif|ico|svg)$/', $request_uri)) {
 }
 
 // Routing logic
-$controller = 'AuthController'; // Default controller
+$controller = 'HomeController'; // Default controller is now Home instead of Auth
 
-if (preg_match('/^\/admin/', $request_uri)) {
+// Route to correct controller based on URI
+if (preg_match('/^\/loove\/app-loove\/public\/admin/', $request_uri)) {
     $controller = 'AdminController';
-} elseif (preg_match('/^\/profile/', $request_uri)) {
+} elseif (preg_match('/^\/loove\/app-loove\/public\/profile/', $request_uri)) {
     $controller = 'ProfileController';
-} elseif (preg_match('/^\/search/', $request_uri)) {
+} elseif (preg_match('/^\/loove\/app-loove\/public\/search/', $request_uri)) {
     $controller = 'SearchController';
-} elseif (preg_match('/^\/match/', $request_uri)) {
+} elseif (preg_match('/^\/loove\/app-loove\/public\/match/', $request_uri)) {
     $controller = 'MatchController';
-} elseif (preg_match('/^\/message/', $request_uri)) {
+} elseif (preg_match('/^\/loove\/app-loove\/public\/message/', $request_uri)) {
     $controller = 'MessageController';
-} elseif (preg_match('/^\/subscription/', $request_uri)) {
-    $controller = 'SubscriptionController';
+} elseif (preg_match('/^\/loove\/app-loove\/public\/login/', $request_uri)) {
+    $controller = 'AuthController';
+    $_GET['action'] = 'login';
+} elseif (preg_match('/^\/loove\/app-loove\/public\/register/', $request_uri)) {
+    $controller = 'AuthController';
+    $_GET['action'] = 'register';
+} elseif (preg_match('/^\/loove\/app-loove\/public\/logout/', $request_uri)) {
+    $controller = 'AuthController';
+    $_GET['action'] = 'logout';
+} elseif (preg_match('/^\/loove\/app-loove\/public\/?$/', $request_uri)) {
+    $controller = 'HomeController'; // Explicit route for home
 }
 
 // Instantiate the controller

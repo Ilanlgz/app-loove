@@ -87,9 +87,9 @@ if (strpos($route, '/') !== false) {
 $controller_name = ucfirst(strtolower($controller_name)) . 'Controller';
 
 // Default to HomeController if not specified
-if ($controller_name === 'Controller') {
-    $controller_name = 'HomeController';
-    $action = 'index';
+if ($controller_name === 'HomeController') {
+    $controller_name = 'AuthController';
+    $action = 'login';
 }
 
 // Check if controller exists
@@ -114,3 +114,64 @@ if (method_exists($controller, $action)) {
         $error_controller->notFound();
     }
 }
+
+private function generateDemoStories() {
+    $demoStories = [];
+    $demoUsers = [
+        ['id' => 101, 'name' => 'Emma Martin', 'profile_picture' => 'demo-user-1.jpg'],
+        ['id' => 102, 'name' => 'Thomas Dubois', 'profile_picture' => 'demo-user-2.jpg'],
+        ['id' => 103, 'name' => 'Sophie Laurent', 'profile_picture' => 'demo-user-3.jpg'],
+        ['id' => 104, 'name' => 'Lucas Bernard', 'profile_picture' => 'demo-user-4.jpg'],
+        ['id' => 105, 'name' => 'Chloé Moreau', 'profile_picture' => 'demo-user-5.jpg']
+    ];
+    
+    $demoImages = ['story-1.jpg', 'story-2.jpg', 'story-3.jpg', 'story-4.jpg', 'story-5.jpg'];
+    
+    for ($i = 0; $i < 5; $i++) {
+        $demoStories[] = [
+            'id' => 1000 + $i,
+            'user_id' => $demoUsers[$i]['id'],
+            'name' => $demoUsers[$i]['name'],
+            'profile_picture' => $demoUsers[$i]['profile_picture'],
+            'image' => $demoImages[$i],
+            'created_at' => date('Y-m-d H:i:s', time() - rand(1, 24) * 3600)
+        ];
+    }
+    
+    return $demoStories;
+}
+
+private function generateDemoPosts() {
+    $demoPosts = [];
+    $demoUsers = [
+        ['id' => 101, 'name' => 'Emma Martin', 'profile_picture' => 'demo-user-1.jpg'],
+        ['id' => 102, 'name' => 'Thomas Dubois', 'profile_picture' => 'demo-user-2.jpg'],
+        ['id' => 103, 'name' => 'Sophie Laurent', 'profile_picture' => 'demo-user-3.jpg'],
+        ['id' => 104, 'name' => 'Lucas Bernard', 'profile_picture' => 'demo-user-4.jpg'],
+        ['id' => 105, 'name' => 'Chloé Moreau', 'profile_picture' => 'demo-user-5.jpg'],
+        ['id' => 106, 'name' => 'Antoine Leroy', 'profile_picture' => 'demo-user-6.jpg'],
+        ['id' => 107, 'name' => 'Julie Petit', 'profile_picture' => 'demo-user-7.jpg'],
+        ['id' => 108, 'name' => 'Nicolas Martin', 'profile_picture' => 'demo-user-8.jpg'],
+        ['id' => 109, 'name' => 'Marine Dubois', 'profile_picture' => 'demo-user-9.jpg'],
+        ['id' => 110, 'name' => 'Maxime Roux', 'profile_picture' => 'demo-user-10.jpg']
+    ];
+    
+    $demoImages = ['post-1.jpg', 'post-2.jpg', 'post-3.jpg', 'post-4.jpg', 'post-5.jpg', 'post-6.jpg', 'post-7.jpg', 'post-8.jpg'];
+    $captions = [
+        'Profiter des beaux jours ☀️ #weekend',
+        'Une belle journée entre amis 🌊',
+        'Après-midi parfait 💕',
+        'Soirée inoubliable 🍹',
+        'Nouvelle tenue, nouveau moi 💯',
+        'Toujours en mouvement 🏃‍♂️',
+        'Moments de détente ✨',
+        'Voyage magnifique 🌍'
+    ];
+    
+    for ($i = 0; $i < 8; $i++) {
+        $userIndex = rand(0, count($demoUsers) - 1);
+        $user = $demoUsers[$userIndex];
+        $demoPosts[] = [
+            'id' => 2000 + $i,
+            'user_id' => $user['id'],
+            'name' => $user['name

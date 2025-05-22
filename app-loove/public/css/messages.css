@@ -1,12 +1,137 @@
 /* Styles spécifiques pour la messagerie */
 
+:root {
+  --primary-color: #ff4b7d; 
+  --primary-light: #ff7ea3;
+  --primary-dark: #e03060;
+  --primary-gradient: linear-gradient(135deg, #ff4b7d 0%, #ff9271 100%);
+  --secondary-color: #6a11cb;
+  --secondary-light: #8c42e9;
+  --accent-color: #ffbb3d;
+  --bg-message: #f8f9ff;
+}
+
+/* Messages Dashboard */
+.messages-dashboard {
+    display: flex;
+    background-color: white;
+    border-radius: 16px;
+    box-shadow: 0 5px 30px rgba(0, 0, 0, 0.1);
+    overflow: hidden;
+    margin: 30px auto;
+    max-width: 1200px;
+    height: 85vh;
+    position: relative;
+}
+
+.messages-dashboard::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 5px;
+    background: var(--primary-gradient);
+    z-index: 1;
+}
+
+.messages-sidebar {
+    width: 350px;
+    border-right: 1px solid rgba(0, 0, 0, 0.05);
+    display: flex;
+    flex-direction: column;
+    background-color: var(--bg-message);
+    background-image: 
+        radial-gradient(at 10% 10%, rgba(255, 75, 125, 0.03) 0px, transparent 50%),
+        radial-gradient(at 90% 90%, rgba(106, 17, 203, 0.03) 0px, transparent 50%);
+}
+
+.messages-header {
+    padding: 20px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    border-bottom: 1px solid rgba(0, 0, 0, 0.05);
+    background-color: white;
+}
+
+.messages-header h2 {
+    margin: 0;
+    font-size: 1.4rem;
+    color: #333;
+    font-weight: 600;
+    background: var(--primary-gradient);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+}
+
+.conversation-item {
+    display: flex;
+    padding: 15px 20px;
+    border-bottom: 1px solid rgba(0, 0, 0, 0.05);
+    text-decoration: none;
+    transition: all 0.2s ease;
+    position: relative;
+}
+
+.conversation-item:hover {
+    background-color: rgba(255, 75, 125, 0.08);
+}
+
+.conversation-item.active {
+    background-color: rgba(255, 75, 125, 0.12);
+    border-left: 3px solid var(--primary-color);
+}
+
+.conversation-item.unread {
+    background-color: rgba(255, 75, 125, 0.08);
+}
+
+.conversation-avatar {
+    width: 50px;
+    height: 50px;
+    border-radius: 50%;
+    overflow: hidden;
+    margin-right: 15px;
+    position: relative;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+    border: 2px solid white;
+}
+
+.messages-welcome {
+    flex: 1;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background-color: white;
+    background-image: 
+        radial-gradient(at 10% 20%, rgba(255, 75, 125, 0.05) 0px, transparent 50%),
+        radial-gradient(at 90% 80%, rgba(106, 17, 203, 0.05) 0px, transparent 50%);
+}
+
+/* Individual Message View */
 .messages-container {
-  background-color: white;
-  border-radius: 12px;
-  box-shadow: 0 5px 20px rgba(0, 0, 0, 0.05);
-  overflow: hidden;
-  margin: 30px 0;
-  animation: slideUp 0.5s ease; /* Animation directement définie ici */
+    background-color: white;
+    border-radius: 16px;
+    box-shadow: 0 5px 30px rgba(0, 0, 0, 0.1);
+    overflow: hidden;
+    margin: 30px auto;
+    max-width: 900px;
+    display: flex;
+    flex-direction: column;
+    height: 80vh;
+    position: relative;
+}
+
+.messages-container::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 5px;
+    background: var(--primary-gradient);
+    z-index: 1;
 }
 
 @keyframes slideUp {
@@ -45,10 +170,14 @@
 }
 
 .message-list {
-  height: 450px;
-  overflow-y: auto;
+  flex: 1;
   padding: 20px;
-  background-color: #f8f9fd;
+  overflow-y: auto;
+  background-color: var(--bg-message);
+  background-image: 
+      radial-gradient(circle at 10% 20%, rgba(255, 75, 125, 0.05) 0px, transparent 30%),
+      radial-gradient(circle at 90% 80%, rgba(106, 17, 203, 0.05) 0px, transparent 30%),
+      url("data:image/svg+xml,%3Csvg width='20' height='20' viewBox='0 0 20 20' xmlns='http://www.w3.org/2000/svg'%3E%3Cg fill='%23ff4b7d' fill-opacity='0.02' fill-rule='evenodd'%3E%3Ccircle cx='3' cy='3' r='3'/%3E%3Ccircle cx='13' cy='13' r='3'/%3E%3C/g%3E%3C/svg%3E");
 }
 
 .message {
@@ -78,6 +207,20 @@
   background-color: white;
   color: #2d3748;
   border-bottom-left-radius: 4px;
+}
+
+.message.received .message-bubble {
+    background-color: white;
+    color: #333;
+    border-bottom-left-radius: 4px;
+    box-shadow: 0 2px 5px rgba(0,0,0,0.05);
+}
+
+.message.sent .message-bubble {
+    background: var(--primary-gradient);
+    color: white;
+    border-bottom-right-radius: 4px;
+    box-shadow: 0 2px 5px rgba(255, 75, 125, 0.2);
 }
 
 .message-form {

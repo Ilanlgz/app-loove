@@ -25,6 +25,20 @@ class BaseController {
         }
     }
     
+    protected function addJs($jsFile) {
+        // Make sure we use absolute path
+        if (strpos($jsFile, '/') === 0 && strpos($jsFile, '/loove/app-loove/public') !== 0) {
+            $jsFile = '/loove/app-loove/public' . $jsFile;
+        } elseif (strpos($jsFile, '/') !== 0) {
+            $jsFile = '/loove/app-loove/public/' . $jsFile;
+        }
+        
+        // Add JS file if not already added
+        if (!isset($this->viewData['jsFiles']) || !in_array($jsFile, $this->viewData['jsFiles'])) {
+            $this->viewData['jsFiles'][] = $jsFile;
+        }
+    }
+    
     protected function setTitle($title) {
         $this->viewData['title'] = $title;
     }

@@ -130,15 +130,8 @@ class AuthController extends BaseController {
                         $_SESSION['user_name'] = $user['name'];
                         $_SESSION['user_email'] = $user['email'];
                         
-                        // Check if there's a redirect URL stored in session
-                        $redirect_to = '/loove/app-loove/public/profile';
-                        if (isset($_SESSION['redirect_after_login'])) {
-                            $redirect_to = $_SESSION['redirect_after_login'];
-                            unset($_SESSION['redirect_after_login']);
-                        }
-                        
-                        // Redirect to intended page
-                        header("Location: " . $redirect_to);
+                        // Redirection après connexion réussie
+                        header("Location: /loove/app-loove/public/profile");
                         exit;
                     } else {
                         $errors[] = "Invalid email or password";

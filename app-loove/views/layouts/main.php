@@ -45,5 +45,16 @@
             <p>&copy; <?php echo date('Y'); ?> Loove Dating App. All rights reserved.</p>
         </div>
     </footer>
+
+    <!-- Scripts -->
+    <?php if(isset($jsFiles) && is_array($jsFiles)): ?>
+        <?php foreach($jsFiles as $jsFile): ?>
+            <script src="<?php echo htmlspecialchars($jsFile); ?>"></script>
+        <?php endforeach; ?>
+    <?php endif; ?>
+    
+    <?php if(isset($currentPage) && $currentPage === 'home'): ?>
+        <script src="<?php echo $baseUrl; ?>/js/home.js"></script>
+    <?php endif; ?>
 </body>
 </html>
