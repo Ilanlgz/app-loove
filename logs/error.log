@@ -1,0 +1,159 @@
+[2025-05-28 11:07:30] Database Connection Error: SQLSTATE[HY000] [1049] Unknown database 'loove_db' (File: C:\xampp\htdocs\loove\config\database.php, Line: 24)
+--------------------------------------------------
+[2025-05-28 11:08:36] Database Connection Error: SQLSTATE[HY000] [1049] Unknown database 'loove_db' (File: C:\xampp\htdocs\loove\config\database.php, Line: 24)
+--------------------------------------------------
+[2025-05-28 11:10:35] Database Connection Error: SQLSTATE[HY000] [1049] Unknown database 'loove_db' (File: C:\xampp\htdocs\loove\config\database.php, Line: 26)
+--------------------------------------------------
+[2025-05-28 11:12:28] No route matched for URL: img/icons/search-heart.svg (File: C:\xampp\htdocs\loove\core\Router.php, Line: 63)
+--------------------------------------------------
+[2025-05-28 11:12:28] No route matched for URL: img/icons/chat-bubbles.svg (File: C:\xampp\htdocs\loove\core\Router.php, Line: 63)
+--------------------------------------------------
+[2025-05-28 11:12:28] No route matched for URL: img/icons/geo-pin.svg (File: C:\xampp\htdocs\loove\core\Router.php, Line: 63)
+--------------------------------------------------
+[2025-05-28 11:12:35] Uncaught exception: 'Error' with message 'Class "User" not found' in C:\xampp\htdocs\loove\core\Controller.php:31 (File: C:\xampp\htdocs\loove\core\Controller.php, Line: 31)
+Stack trace:
+#0 C:\xampp\htdocs\loove\app\controllers\UserController.php(13): Controller->model('User')
+#1 C:\xampp\htdocs\loove\core\Router.php(43): App\Controllers\UserController->__construct(Array)
+#2 C:\xampp\htdocs\loove\public\index.php(62): Router->dispatch('dashboard')
+#3 {main}
+--------------------------------------------------
+[2025-05-28 11:14:20] No route matched for URL: img/default-avatar.png (File: C:\xampp\htdocs\loove\core\Router.php, Line: 63)
+--------------------------------------------------
+[2025-05-28 11:14:26] No route matched for URL: img/icons/search-heart.svg (File: C:\xampp\htdocs\loove\core\Router.php, Line: 63)
+--------------------------------------------------
+[2025-05-28 11:14:26] No route matched for URL: img/icons/chat-bubbles.svg (File: C:\xampp\htdocs\loove\core\Router.php, Line: 63)
+--------------------------------------------------
+[2025-05-28 11:14:26] No route matched for URL: img/icons/geo-pin.svg (File: C:\xampp\htdocs\loove\core\Router.php, Line: 63)
+--------------------------------------------------
+[2025-05-28 11:14:27] No route matched for URL: img/default-avatar.png (File: C:\xampp\htdocs\loove\core\Router.php, Line: 63)
+--------------------------------------------------
+[2025-05-28 11:14:28] No route matched for URL: img/icons/search-heart.svg (File: C:\xampp\htdocs\loove\core\Router.php, Line: 63)
+--------------------------------------------------
+[2025-05-28 11:14:29] No route matched for URL: img/icons/geo-pin.svg (File: C:\xampp\htdocs\loove\core\Router.php, Line: 63)
+--------------------------------------------------
+[2025-05-28 11:14:29] No route matched for URL: img/icons/chat-bubbles.svg (File: C:\xampp\htdocs\loove\core\Router.php, Line: 63)
+--------------------------------------------------
+[2025-05-28 11:14:30] No route matched for URL: img/default-avatar.png (File: C:\xampp\htdocs\loove\core\Router.php, Line: 63)
+--------------------------------------------------
+[2025-05-28 11:18:51] No route matched for URL: img/default-avatar.png (File: C:\xampp\htdocs\loove\core\Router.php, Line: 63)
+--------------------------------------------------
+[2025-05-28 11:18:52] No route matched for URL: img/default-avatar.png (File: C:\xampp\htdocs\loove\core\Router.php, Line: 63)
+--------------------------------------------------
+[2025-05-28 11:18:53] No route matched for URL: img/icons/search-heart.svg (File: C:\xampp\htdocs\loove\core\Router.php, Line: 63)
+--------------------------------------------------
+[2025-05-28 11:18:53] No route matched for URL: img/icons/geo-pin.svg (File: C:\xampp\htdocs\loove\core\Router.php, Line: 63)
+--------------------------------------------------
+[2025-05-28 11:18:53] No route matched for URL: img/icons/chat-bubbles.svg (File: C:\xampp\htdocs\loove\core\Router.php, Line: 63)
+--------------------------------------------------
+[2025-05-28 11:29:04] No route matched for URL: img/icons/search-heart.svg (File: C:\xampp\htdocs\loove\core\Router.php, Line: 63)
+--------------------------------------------------
+[2025-05-28 11:29:04] No route matched for URL: img/icons/chat-bubbles.svg (File: C:\xampp\htdocs\loove\core\Router.php, Line: 63)
+--------------------------------------------------
+[2025-05-28 11:29:04] No route matched for URL: img/icons/geo-pin.svg (File: C:\xampp\htdocs\loove\core\Router.php, Line: 63)
+--------------------------------------------------
+[2025-05-28 11:29:06] No route matched for URL: img/default-avatar.png (File: C:\xampp\htdocs\loove\core\Router.php, Line: 63)
+--------------------------------------------------
+[2025-05-28 11:29:08] No route matched for URL: img/default-avatar.png (File: C:\xampp\htdocs\loove\core\Router.php, Line: 63)
+--------------------------------------------------
+[2025-05-28 11:29:09] No route matched for URL: img/icons/chat-bubbles.svg (File: C:\xampp\htdocs\loove\core\Router.php, Line: 63)
+--------------------------------------------------
+[2025-05-28 11:29:09] No route matched for URL: img/icons/search-heart.svg (File: C:\xampp\htdocs\loove\core\Router.php, Line: 63)
+--------------------------------------------------
+[2025-05-28 11:29:09] No route matched for URL: img/icons/geo-pin.svg (File: C:\xampp\htdocs\loove\core\Router.php, Line: 63)
+--------------------------------------------------
+[2025-05-28 11:30:32] No route matched for URL: img/icons/search-heart.svg (File: C:\xampp\htdocs\loove\core\Router.php, Line: 63)
+--------------------------------------------------
+[2025-05-28 11:30:32] No route matched for URL: img/icons/chat-bubbles.svg (File: C:\xampp\htdocs\loove\core\Router.php, Line: 63)
+--------------------------------------------------
+[2025-05-28 11:30:32] No route matched for URL: img/icons/geo-pin.svg (File: C:\xampp\htdocs\loove\core\Router.php, Line: 63)
+--------------------------------------------------
+[2025-05-28 11:30:41] No route matched for URL: user/logout (File: C:\xampp\htdocs\loove\core\Router.php, Line: 63)
+--------------------------------------------------
+[2025-05-28 11:30:43] No route matched for URL: img/icons/search-heart.svg (File: C:\xampp\htdocs\loove\core\Router.php, Line: 63)
+--------------------------------------------------
+[2025-05-28 11:30:43] No route matched for URL: img/icons/chat-bubbles.svg (File: C:\xampp\htdocs\loove\core\Router.php, Line: 63)
+--------------------------------------------------
+[2025-05-28 11:30:43] No route matched for URL: img/icons/geo-pin.svg (File: C:\xampp\htdocs\loove\core\Router.php, Line: 63)
+--------------------------------------------------
+[2025-05-28 11:35:02] No route matched for URL: img/default-avatar.png (File: C:\xampp\htdocs\loove\core\Router.php, Line: 63)
+--------------------------------------------------
+[2025-05-28 11:35:04] No route matched for URL: img/default-avatar.png (File: C:\xampp\htdocs\loove\core\Router.php, Line: 63)
+--------------------------------------------------
+[2025-05-28 11:35:06] No route matched for URL: img/default-avatar.png (File: C:\xampp\htdocs\loove\core\Router.php, Line: 63)
+--------------------------------------------------
+[2025-05-28 11:35:07] No route matched for URL: img/default-avatar.png (File: C:\xampp\htdocs\loove\core\Router.php, Line: 63)
+--------------------------------------------------
+[2025-05-28 11:35:08] No route matched for URL: search (File: C:\xampp\htdocs\loove\core\Router.php, Line: 63)
+--------------------------------------------------
+[2025-05-28 11:35:10] No route matched for URL: img/default-avatar.png (File: C:\xampp\htdocs\loove\core\Router.php, Line: 63)
+--------------------------------------------------
+[2025-05-28 11:35:11] No route matched for URL: user/logout (File: C:\xampp\htdocs\loove\core\Router.php, Line: 63)
+--------------------------------------------------
+[2025-05-28 11:35:13] No route matched for URL: img/default-avatar.png (File: C:\xampp\htdocs\loove\core\Router.php, Line: 63)
+--------------------------------------------------
+[2025-05-28 11:35:14] No route matched for URL: img/default-avatar.png (File: C:\xampp\htdocs\loove\core\Router.php, Line: 63)
+--------------------------------------------------
+[2025-05-28 11:35:17] No route matched for URL: messages (File: C:\xampp\htdocs\loove\core\Router.php, Line: 63)
+--------------------------------------------------
+[2025-05-28 11:35:18] No route matched for URL: img/default-avatar.png (File: C:\xampp\htdocs\loove\core\Router.php, Line: 63)
+--------------------------------------------------
+[2025-05-28 11:35:20] No route matched for URL: subscription (File: C:\xampp\htdocs\loove\core\Router.php, Line: 63)
+--------------------------------------------------
+[2025-05-28 11:35:22] No route matched for URL: img/default-avatar.png (File: C:\xampp\htdocs\loove\core\Router.php, Line: 63)
+--------------------------------------------------
+[2025-05-28 11:35:23] No route matched for URL: matches (File: C:\xampp\htdocs\loove\core\Router.php, Line: 63)
+--------------------------------------------------
+[2025-05-28 11:35:25] No route matched for URL: img/default-avatar.png (File: C:\xampp\htdocs\loove\core\Router.php, Line: 63)
+--------------------------------------------------
+[2025-05-28 11:40:54] No route matched for URL: img/icons/search-heart.svg (File: C:\xampp\htdocs\loove\core\Router.php, Line: 63)
+--------------------------------------------------
+[2025-05-28 11:40:54] No route matched for URL: img/icons/chat-bubbles.svg (File: C:\xampp\htdocs\loove\core\Router.php, Line: 63)
+--------------------------------------------------
+[2025-05-28 11:40:54] No route matched for URL: img/icons/geo-pin.svg (File: C:\xampp\htdocs\loove\core\Router.php, Line: 63)
+--------------------------------------------------
+[2025-05-28 11:40:59] No route matched for URL: img/icons/search-heart.svg (File: C:\xampp\htdocs\loove\core\Router.php, Line: 63)
+--------------------------------------------------
+[2025-05-28 11:40:59] No route matched for URL: img/icons/chat-bubbles.svg (File: C:\xampp\htdocs\loove\core\Router.php, Line: 63)
+--------------------------------------------------
+[2025-05-28 11:40:59] No route matched for URL: img/icons/geo-pin.svg (File: C:\xampp\htdocs\loove\core\Router.php, Line: 63)
+--------------------------------------------------
+[2025-05-28 11:41:00] No route matched for URL: img/icons/search-heart.svg (File: C:\xampp\htdocs\loove\core\Router.php, Line: 63)
+--------------------------------------------------
+[2025-05-28 11:41:00] No route matched for URL: img/icons/chat-bubbles.svg (File: C:\xampp\htdocs\loove\core\Router.php, Line: 63)
+--------------------------------------------------
+[2025-05-28 11:41:00] No route matched for URL: img/icons/geo-pin.svg (File: C:\xampp\htdocs\loove\core\Router.php, Line: 63)
+--------------------------------------------------
+[2025-05-28 11:41:00] No route matched for URL: img/icons/search-heart.svg (File: C:\xampp\htdocs\loove\core\Router.php, Line: 63)
+--------------------------------------------------
+[2025-05-28 11:41:00] No route matched for URL: img/icons/chat-bubbles.svg (File: C:\xampp\htdocs\loove\core\Router.php, Line: 63)
+--------------------------------------------------
+[2025-05-28 11:41:00] No route matched for URL: img/icons/geo-pin.svg (File: C:\xampp\htdocs\loove\core\Router.php, Line: 63)
+--------------------------------------------------
+[2025-05-28 11:41:01] No route matched for URL: img/icons/chat-bubbles.svg (File: C:\xampp\htdocs\loove\core\Router.php, Line: 63)
+--------------------------------------------------
+[2025-05-28 11:41:01] No route matched for URL: img/icons/search-heart.svg (File: C:\xampp\htdocs\loove\core\Router.php, Line: 63)
+--------------------------------------------------
+[2025-05-28 11:41:01] No route matched for URL: img/icons/geo-pin.svg (File: C:\xampp\htdocs\loove\core\Router.php, Line: 63)
+--------------------------------------------------
+[2025-05-28 11:41:02] No route matched for URL: img/icons/chat-bubbles.svg (File: C:\xampp\htdocs\loove\core\Router.php, Line: 63)
+--------------------------------------------------
+[2025-05-28 11:41:02] No route matched for URL: img/icons/search-heart.svg (File: C:\xampp\htdocs\loove\core\Router.php, Line: 63)
+--------------------------------------------------
+[2025-05-28 11:41:02] No route matched for URL: img/icons/geo-pin.svg (File: C:\xampp\htdocs\loove\core\Router.php, Line: 63)
+--------------------------------------------------
+[2025-05-28 11:41:03] No route matched for URL: img/default-avatar.png (File: C:\xampp\htdocs\loove\core\Router.php, Line: 63)
+--------------------------------------------------
+[2025-05-28 11:41:04] No route matched for URL: search (File: C:\xampp\htdocs\loove\core\Router.php, Line: 63)
+--------------------------------------------------
+[2025-05-28 11:41:06] No route matched for URL: img/icons/chat-bubbles.svg (File: C:\xampp\htdocs\loove\core\Router.php, Line: 63)
+--------------------------------------------------
+[2025-05-28 11:41:06] No route matched for URL: img/icons/search-heart.svg (File: C:\xampp\htdocs\loove\core\Router.php, Line: 63)
+--------------------------------------------------
+[2025-05-28 11:41:06] No route matched for URL: img/icons/geo-pin.svg (File: C:\xampp\htdocs\loove\core\Router.php, Line: 63)
+--------------------------------------------------
+[2025-05-28 11:42:56] No route matched for URL: img/icons/search-heart.svg (File: C:\xampp\htdocs\loove\core\Router.php, Line: 63)
+--------------------------------------------------
+[2025-05-28 11:42:56] No route matched for URL: img/icons/chat-bubbles.svg (File: C:\xampp\htdocs\loove\core\Router.php, Line: 63)
+--------------------------------------------------
+[2025-05-28 11:42:56] No route matched for URL: img/icons/geo-pin.svg (File: C:\xampp\htdocs\loove\core\Router.php, Line: 63)
+--------------------------------------------------

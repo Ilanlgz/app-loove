@@ -1,0 +1,31 @@
+RewriteEngine On
+RewriteBase /loove/public/
+
+# Redirect Trailing Slashes If Not A Folder...
+RewriteCond %{REQUEST_FILENAME} !-d
+RewriteCond %{REQUEST_URI} (.+)/$
+RewriteRule ^ %1 [L,R=301]
+
+# Handle Front Controller...
+RewriteCond %{REQUEST_FILENAME} !-d
+RewriteCond %{REQUEST_FILENAME} !-f
+RewriteRule ^ index.php [L]
+
+# Redirect everything to index.php
+RewriteCond %{REQUEST_FILENAME} !-f
+RewriteCond %{REQUEST_FILENAME} !-d
+RewriteRule ^(.*)$ index.php?url=$1 [QSA,L]
+
+# Block access to .php files in /app, /core, /config, /logs
+RewriteRule ^(app|core|config|logs)/.*\.php$ - [F,L]
+RewriteRule ^(composer\.json|composer\.lock|README\.md)$ - [F,L]
+RewriteRule ^(\.env|\.gitattributes|\.gitignore)$ - [F,L]
+
+# For security, deny access to .htaccess and .htpasswd files
+<Files ~ "^\.ht">
+  Order allow,deny
+  Deny from all
+</Files>
+
+# Disable directory browsing
+Options -Indexes

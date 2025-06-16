@@ -1,0 +1,5 @@
+{
+    "require": {
+        "pusher/pusher-push-notifications": "^2.0"
+    }
+}

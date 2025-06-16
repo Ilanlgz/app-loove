@@ -1,0 +1,12 @@
+# Désactiver temporairement le routage automatique
+# RewriteEngine On
+# RewriteRule ^(.*)$ public/index.php?url=$1 [QSA,L]
+
+# Permettre l'accès direct aux fichiers PHP
+RewriteEngine On
+
+# Exceptions pour les fichiers spécifiques
+RewriteCond %{REQUEST_URI} !^/loove/(login|register|process_login|process_register|accueil|logout)\.php$
+RewriteCond %{REQUEST_FILENAME} !-f
+RewriteCond %{REQUEST_FILENAME} !-d
+RewriteRule ^(.*)$ public/index.php?url=$1 [QSA,L]
