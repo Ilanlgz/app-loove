@@ -382,8 +382,8 @@ if($success_message) {
                 <a href="test_notification.php" style="background: rgba(255,255,255,0.2); color: white; padding: 10px 20px; border-radius: 8px; text-decoration: none; font-weight: 500; margin-right: 10px;">
                     🧪 Tester les notifications push
                 </a>
-                <a href="send_message_with_notification.php" style="background: rgba(255,255,255,0.3); color: white; padding: 10px 20px; border-radius: 8px; text-decoration: none; font-weight: 500;">
-                    💬 Envoyer un message avec notif
+                <a href="simple_message_test.php" style="background: rgba(255,255,255,0.3); color: white; padding: 10px 20px; border-radius: 8px; text-decoration: none; font-weight: 500;">
+                    📲 Test Notifications Direct
                 </a>
             </div>
         </section>

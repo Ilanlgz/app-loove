@@ -1,0 +1,38 @@
+# Fichiers sensibles
+config/database.php
+vendor/
+.env
+
+# Uploads et fichiers utilisateurs
+uploads/
+uploads/profiles/*
+
+# Logs
+*.log
+error_log
+
+# Cache
+cache/
+temp/
+
+# OS
+.DS_Store
+Thumbs.db
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# Composer
+composer.lock
+
+# Node modules (si tu en as)
+node_modules/
+npm-debug.log
+
+# Fichiers temporaires
+*.tmp
+*.bak
+*~
