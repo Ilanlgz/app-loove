@@ -181,4 +181,44 @@ class User {
         return $stmt->fetchAll(PDO::FETCH_ASSOC);
     }
 }
+
+class UserSystem {
+    private $conn;
+    
+    public function __construct($conn) {
+        $this->conn = $conn;
+    }
+    
+    // Vérifier si l'utilisateur a un abonnement premium
+    public function isPremiumUser($user_id) {
+        // Vérifier dans la table subscriptions
+        try {
+            $stmt = $this->conn->prepare("SHOW TABLES LIKE 'subscriptions'");
+            $stmt->execute();
+            
+            if ($stmt->rowCount() > 0) {
+                $stmt = $this->conn->prepare("SELECT * FROM subscriptions WHERE user_id = ? AND end_date > NOW() AND status = 'active'");
+                $stmt->execute([$user_id]);
+                
+                return $stmt->rowCount() > 0;
+            }
+            
+            // Si la table n'existe pas, vérifier dans la table users si une colonne premium existe
+            $stmt = $this->conn->prepare("SHOW COLUMNS FROM users LIKE 'is_premium'");
+            $stmt->execute();
+            
+            if ($stmt->rowCount() > 0) {
+                $stmt = $this->conn->prepare("SELECT is_premium FROM users WHERE id = ?");
+                $stmt->execute([$user_id]);
+                
+                $result = $stmt->fetch(PDO::FETCH_ASSOC);
+                return isset($result['is_premium']) && $result['is_premium'] == 1;
+            }
+            
+            return false;
+        } catch (Exception $e) {
+            return false; // Si une erreur se produit, on considère que l'utilisateur n'est pas premium
+        }
+    }
+}
 ?>

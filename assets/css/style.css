@@ -1,0 +1,166 @@
+/* Amélioration des styles des boutons */
+.action-button, .conversation-item {
+    cursor: pointer !important;
+    transition: transform 0.2s ease, box-shadow 0.2s ease;
+}
+
+.action-button:hover, .conversation-item:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 5px 15px rgba(0,0,0,0.1);
+}
+
+.action-button:active, .conversation-item:active {
+    transform: translateY(1px);
+}
+
+/* Animations pour like/dislike */
+.user-card.liked {
+    animation: swipeRight 0.5s forwards;
+}
+
+.user-card.disliked {
+    animation: swipeLeft 0.5s forwards;
+}
+
+@keyframes swipeRight {
+    to {
+        transform: translateX(150%) rotate(10deg);
+        opacity: 0;
+    }
+}
+
+@keyframes swipeLeft {
+    to {
+        transform: translateX(-150%) rotate(-10deg);
+        opacity: 0;
+    }
+}
+
+/* Assurer que les éléments cliquables le sont visuellement */
+.user-actions {
+    pointer-events: auto !important;
+}
+
+.conversation-item, .action-button, button, [role="button"], a.btn {
+    pointer-events: auto !important;
+    cursor: pointer !important;
+}
+
+/* Styles pour rendre les conversations cliquables */
+.conversation-item {
+    cursor: pointer !important;
+    transition: background-color 0.2s ease;
+    position: relative;
+}
+
+.conversation-item:hover {
+    background-color: rgba(255, 68, 88, 0.1) !important;
+}
+
+.conversation-item::after {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    z-index: 1;
+}
+
+.conversation-item * {
+    position: relative;
+    z-index: 2;
+}
+
+/* Styles pour le formulaire de message */
+.message-form {
+    display: flex;
+    padding: 10px;
+    background: #fff;
+    border-top: 1px solid #eee;
+    z-index: 10;
+}
+
+.message-form textarea {
+    flex: 1;
+    padding: 12px;
+    border: 1px solid #e1e1e1;
+    border-radius: 20px;
+    resize: none;
+    font-family: inherit;
+    height: 24px;
+    max-height: 100px;
+    transition: height 0.2s ease;
+}
+
+.message-form textarea:focus {
+    height: 60px;
+    outline: none;
+    border-color: #FF4458;
+}
+
+.message-form button {
+    background: #FF4458;
+    color: white;
+    border: none;
+    width: 40px;
+    height: 40px;
+    border-radius: 50%;
+    margin-left: 10px;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: transform 0.2s ease, background-color 0.2s ease;
+}
+
+.message-form button:hover {
+    background: #E63950;
+    transform: scale(1.05);
+}
+
+/* Animation pour envoyer un message */
+@keyframes sendMessage {
+    0% { transform: translateY(0); opacity: 1; }
+    100% { transform: translateY(-20px); opacity: 0; }
+}
+
+.sending {
+    animation: sendMessage 0.3s forwards;
+}
+
+/* Optimisation du logo pour mobile */
+@media (max-width: 768px) {
+    .logo {
+        font-size: 18px; /* Réduit de 22px à 18px */
+        font-weight: 700;
+        color: white;
+        letter-spacing: 0.3px; /* Réduit de 0.5px */
+        display: flex;
+        align-items: center;
+    }
+    
+    .logo i {
+        margin-right: 4px; /* Réduit de 6px à 4px */
+        font-size: 16px; /* Réduit de 20px à 16px */
+    }
+    
+    .nav-container {
+        padding: 0 12px; /* Réduit de 24px à 12px */
+    }
+    
+    .user-info span {
+        display: none; /* Cache le texte "Bonjour ilan !" sur mobile */
+    }
+    
+    .user-avatar {
+        width: 28px; /* Réduit de 32px à 28px */
+        height: 28px;
+        font-size: 12px; /* Réduit de 14px à 12px */
+    }
+    
+    .btn-logout {
+        padding: 4px 8px; /* Réduit de 6px 12px */
+        font-size: 11px; /* Réduit de 13px à 11px */
+    }
+}

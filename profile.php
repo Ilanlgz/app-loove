@@ -1,7 +1,8 @@
 <?php
 session_start();
 
-if(!isset($_SESSION["loggedin"]) || $_SESSION["loggedin"] !== true){
+// Vérification
+if (!isset($_SESSION["loggedin"]) || $_SESSION["loggedin"] !== true) {
     header("location: login.php");
     exit;
 }
@@ -239,16 +240,281 @@ if (isset($message)) {
     $user_photos = isset($user['photos']) && $user['photos'] ? explode(',', $user['photos']) : [];
 }
 ?>
-
 <!DOCTYPE html>
 <html lang="fr">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Mon Profil - Loove</title>
-    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
-    <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;600;700&display=swap" rel="stylesheet">
-    <style>
+    <title>Profil - Loove</title>
+    <link rel="stylesheet" href="assets/css/style.css">
+    <link rel="stylesheet" href="assets/css/navbar.css">
+    <link rel="stylesheet" href="assets/css/hearts-background.css">
+    <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;600;700&display=swap" rel="stylesheet">    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="assets/css/footer.css">
+    <style>/* Reset et base avec background rouge travaillé */
+        body, html {
+            margin: 0;
+            padding: 0;
+            font-family: 'Poppins', sans-serif;
+            background: linear-gradient(135deg, #FF4458 0%, #FF6B81 25%, #FD5068 50%, #FF8A95 75%, #FFB3C1 100%);
+            min-height: 100vh;
+            position: relative;
+            overflow-x: hidden;
+        }
+
+        body::before {
+            content: '';
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: 
+                radial-gradient(circle at 20% 80%, rgba(255, 68, 88, 0.3) 0%, transparent 50%),
+                radial-gradient(circle at 80% 20%, rgba(255, 107, 129, 0.3) 0%, transparent 50%),
+                radial-gradient(circle at 40% 40%, rgba(253, 80, 104, 0.2) 0%, transparent 50%);
+            z-index: -1;
+            animation: floatingColors 20s ease-in-out infinite;
+        }
+
+        @keyframes floatingColors {
+            0%, 100% { 
+                background: 
+                    radial-gradient(circle at 20% 80%, rgba(255, 68, 88, 0.3) 0%, transparent 50%),
+                    radial-gradient(circle at 80% 20%, rgba(255, 107, 129, 0.3) 0%, transparent 50%),
+                    radial-gradient(circle at 40% 40%, rgba(253, 80, 104, 0.2) 0%, transparent 50%);
+            }
+            50% { 
+                background: 
+                    radial-gradient(circle at 70% 30%, rgba(255, 68, 88, 0.3) 0%, transparent 50%),
+                    radial-gradient(circle at 30% 70%, rgba(255, 107, 129, 0.3) 0%, transparent 50%),
+                    radial-gradient(circle at 60% 60%, rgba(253, 80, 104, 0.2) 0%, transparent 50%);
+            }
+        }
+
+        /* Cœurs flottants réactifs */
+        .floating-hearts {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            pointer-events: none;
+            z-index: 1;
+            overflow: hidden;
+        }
+
+        .floating-heart {
+            position: absolute;
+            color: rgba(255, 255, 255, 0.6);
+            font-size: 20px;
+            animation: floatUp 8s infinite linear;
+            opacity: 0;
+        }
+
+        .floating-heart:nth-child(odd) {
+            color: rgba(255, 68, 88, 0.7);
+            animation-duration: 10s;
+        }
+
+        .floating-heart:nth-child(3n) {
+            color: rgba(255, 107, 129, 0.6);
+            animation-duration: 12s;
+            font-size: 16px;
+        }
+
+        .floating-heart:nth-child(4n) {
+            color: rgba(253, 80, 104, 0.5);
+            animation-duration: 9s;
+            font-size: 24px;
+        }
+
+        .floating-heart:nth-child(5n) {
+            color: rgba(255, 138, 149, 0.7);
+            animation-duration: 11s;
+            font-size: 18px;
+        }
+
+        @keyframes floatUp {
+            0% {
+                opacity: 0;
+                transform: translateY(100vh) rotate(0deg) scale(0);
+            }
+            10% {
+                opacity: 1;
+                transform: translateY(90vh) rotate(45deg) scale(1);
+            }
+            90% {
+                opacity: 1;
+                transform: translateY(10vh) rotate(315deg) scale(1);
+            }
+            100% {
+                opacity: 0;
+                transform: translateY(-10vh) rotate(360deg) scale(0);
+            }
+        }        /* Header unifié avec taille cohérente - FORCE OVERRIDE */
+        .header {
+            background: linear-gradient(135deg, #FF4458, #FF6B81) !important;
+            backdrop-filter: blur(20px) !important;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.2) !important;
+            padding: 12px 0 !important;
+            position: sticky !important;
+            top: 0 !important;
+            z-index: 1000 !important;
+            box-shadow: 0 2px 20px rgba(0, 0, 0, 0.1) !important;
+        }
+
+        .nav-container {
+            max-width: 1400px !important;
+            margin: 0 auto !important;
+            padding: 0 24px !important;
+            display: flex !important;
+            justify-content: space-between !important;
+            align-items: center !important;
+        }
+
+        .logo {
+            font-size: 22px !important;
+            font-weight: 700 !important;
+            color: white !important;
+            letter-spacing: 0.5px !important;
+            display: flex !important;
+            align-items: center !important;
+            text-decoration: none !important;
+            transition: opacity 0.3s ease !important;
+        }
+
+        .logo:hover {
+            opacity: 0.8 !important;
+        }
+
+        .logo i {
+            margin-right: 6px !important;
+            font-size: 20px !important;
+        }
+
+        .nav-menu {
+            display: flex !important;
+            align-items: center !important;
+            gap: 8px !important;
+        }
+
+        .nav-link {
+            display: flex !important;
+            align-items: center !important;
+            gap: 6px !important;
+            padding: 8px 16px !important;
+            color: rgba(255, 255, 255, 0.9) !important;
+            text-decoration: none !important;
+            border-radius: 8px !important;
+            font-weight: 500 !important;
+            transition: all 0.3s ease !important;
+            position: relative !important;
+            font-size: 14px !important;
+        }
+
+        .nav-link:hover {
+            background: rgba(255, 255, 255, 0.15) !important;
+            color: white !important;
+            transform: translateY(-2px) !important;
+        }
+
+        .nav-link.active {
+            background: rgba(255, 255, 255, 0.25) !important;
+            color: white !important;
+            box-shadow: 0 4px 12px rgba(255, 255, 255, 0.2) !important;
+        }
+
+        .nav-link i {
+            font-size: 16px !important;
+            width: 16px !important;
+            text-align: center !important;
+        }
+
+        .user-info {
+            display: flex !important;
+            align-items: center !important;
+            gap: 12px !important;
+            margin-left: 20px !important;
+            padding-left: 20px !important;
+            border-left: 1px solid rgba(255, 255, 255, 0.3) !important;
+        }
+
+        .user-avatar {
+            width: 32px !important;
+            height: 32px !important;
+            background: white !important;
+            border-radius: 50% !important;
+            display: flex !important;
+            align-items: center !important;
+            justify-content: center !important;
+            color: #FF4458 !important;
+            font-weight: 600 !important;
+            font-size: 14px !important;
+        }
+
+        .user-info span {
+            font-weight: 500 !important;
+            color: white !important;
+        }
+
+        .btn-logout {
+            display: flex !important;
+            align-items: center !important;
+            gap: 6px !important;
+            padding: 6px 12px !important;
+            background: rgba(255, 255, 255, 0.15) !important;
+            color: white !important;
+            text-decoration: none !important;
+            border-radius: 6px !important;
+            font-weight: 500 !important;
+            transition: all 0.3s ease !important;
+            font-size: 13px !important;
+        }
+
+        .btn-logout:hover {
+            background: white !important;
+            color: #FF4458 !important;
+            transform: translateY(-2px) !important;
+            box-shadow: 0 4px 12px rgba(255, 255, 255, 0.3) !important;
+        }
+
+        /* Responsive navbar */
+        @media (max-width: 768px) {
+            .nav-container {
+                padding: 0 16px !important;
+            }
+            
+            .user-info span {
+                display: none !important;
+            }
+            
+            .nav-link {
+                padding: 6px 12px !important;
+                font-size: 13px !important;
+            }
+        }/* Améliorer la transparence des cartes sur le nouveau fond */
+        .profile-header {
+            background: rgba(255, 255, 255, 0.95) !important;
+            backdrop-filter: blur(20px) !important;
+            border: 1px solid rgba(255, 255, 255, 0.2) !important;
+        }
+
+        .profile-form {
+            background: rgba(255, 255, 255, 0.95) !important;
+            backdrop-filter: blur(20px) !important;
+            border: 1px solid rgba(255, 255, 255, 0.2) !important;
+        }
+
+        .form-section:last-child {
+            background: rgba(255, 255, 255, 0.95) !important;
+            backdrop-filter: blur(20px) !important;
+            border: 1px solid rgba(255, 255, 255, 0.2) !important;
+            border-radius: 20px;
+            padding: 40px;
+            margin-top: 30px;
+            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.1);
+        }
         :root {
             --primary-color: #FF4458;
             --secondary-color: #FD5068;
@@ -260,69 +526,12 @@ if (isset($message)) {
             --error: #FF3B30;
         }
 
-        * { margin: 0; padding: 0; box-sizing: border-box; }
-
-        body {
+        * { margin: 0; padding: 0; box-sizing: border-box; }        body {
             font-family: 'Poppins', sans-serif;
-            background: var(--background);
             color: var(--text-primary);
         }
 
-        .header {
-            background: var(--white);
-            padding: 20px;
-            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
-            position: sticky;
-            top: 0;
-            z-index: 100;
-        }
-
-        .nav-container {
-            max-width: 1200px;
-            margin: 0 auto;
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-        }
-
-        .logo {
-            font-size: 1.8rem;
-            font-weight: 700;
-            color: var(--primary-color);
-            text-decoration: none;
-        }
-
-        .nav-menu {
-            display: flex;
-            gap: 30px;
-            align-items: center;
-        }
-
-        .nav-link {
-            color: var(--text-primary);
-            text-decoration: none;
-            font-weight: 500;
-            padding: 10px 15px;
-            border-radius: 8px;
-            transition: all 0.3s ease;
-        }
-
-        .nav-link:hover, .nav-link.active {
-            color: var(--primary-color);
-            background: rgba(255, 68, 88, 0.1);
-        }
-
-        .btn-logout {
-            background: linear-gradient(135deg, var(--primary-color), var(--secondary-color));
-            color: var(--white);
-            padding: 10px 20px;
-            border: none;
-            border-radius: 8px;
-            text-decoration: none;
-            font-weight: 600;
-        }
-
-        .main-content {
+        .profile-container {
             max-width: 1000px;
             margin: 0 auto;
             padding: 40px 20px;
@@ -692,7 +901,7 @@ if (isset($message)) {
                 gap: 20px;
             }
             
-            .main-content {
+            .profile-container {
                 padding: 20px 10px;
             }
             
@@ -703,32 +912,26 @@ if (isset($message)) {
     </style>
 </head>
 <body>
-    <header class="header">
-        <div class="nav-container">
-            <a href="main.php" class="logo">
-                <i class="fas fa-heart"></i> Loove
-            </a>
-            <nav class="nav-menu">
-                <a href="discover.php" class="nav-link">
-                    <i class="fas fa-search"></i> Découvrir
-                </a>
-                <a href="matches.php" class="nav-link">
-                    <i class="fas fa-heart"></i> Matches
-                </a>
-                <a href="messages.php" class="nav-link">
-                    <i class="fas fa-comments"></i> Messages
-                </a>
-                <a href="profile.php" class="nav-link active">
-                    <i class="fas fa-user"></i> Profil
-                </a>
-                <a href="logout.php" class="btn-logout">
-                    <i class="fas fa-sign-out-alt"></i> Déconnexion
-                </a>
-            </nav>
-        </div>
-    </header>
+    <!-- Cœurs flottants réactifs -->
+    <div class="floating-hearts" id="floatingHearts"></div>
 
-    <main class="main-content">
+    <!-- Container des coeurs flottants -->
+    <div class="hearts-container">
+        <i class="fas fa-heart heart"></i>
+        <i class="fas fa-heart heart"></i>
+        <i class="fas fa-heart heart"></i>
+        <i class="fas fa-heart heart"></i>
+        <i class="fas fa-heart heart"></i>
+        <i class="fas fa-heart heart"></i>
+        <i class="fas fa-heart heart"></i>
+        <i class="fas fa-heart heart"></i>
+        <i class="fas fa-heart heart"></i>
+        <i class="fas fa-heart heart"></i>
+    </div>
+
+    <?php include 'includes/navbar.php'; ?>
+    
+    <div class="profile-container">
         <!-- En-tête du profil -->
         <div class="profile-header">
             <div class="profile-avatar">
@@ -783,7 +986,7 @@ if (isset($message)) {
                     <div class="stat-number">
                         <?php
                         // Compter les likes donnés
-                        $likes_query = "SELECT COUNT(*) as count FROM likes WHERE from_user_id = :user_id";
+                        $likes_query = "SELECT COUNT(*) as count FROM likes WHERE user_id = :user_id";
                         $stmt = $conn->prepare($likes_query);
                         $stmt->bindParam(':user_id', $_SESSION["user_id"], PDO::PARAM_INT);
                         $stmt->execute();
@@ -1021,8 +1224,8 @@ if (isset($message)) {
                 <input type="hidden" name="upload_photos" value="1">
             </form>
         </div>
-    </main>
-
+    </div>
+    
     <script>
         function addInterest(interest) {
             const input = document.querySelector('input[name="interests"]');
@@ -1093,16 +1296,93 @@ if (isset($message)) {
                 reader.onload = function(e) {
                     const avatarImg = document.querySelector('.avatar-img');
                     const avatarPlaceholder = document.querySelector('.avatar-placeholder');
-                    
                     if (avatarImg) {
                         avatarImg.src = e.target.result;
                     } else if (avatarPlaceholder) {
-                        avatarPlaceholder.innerHTML = `<img src="${e.target.result}" style="width: 100%; height: 100%; object-fit: cover; border-radius: 50%;">`;
+                        avatarPlaceholder.innerHTML = `<img src="${e.target.result}" alt="Avatar" class="avatar-img">`;
                     }
-                };
-                reader.readAsDataURL(e.target.files[0]);
+                };                reader.readAsDataURL(e.target.files[0]);
             }
         });
+
+        // Génération dynamique des cœurs flottants réactifs
+        function createFloatingHearts() {
+            const heartsContainer = document.getElementById('floatingHearts');
+            if (!heartsContainer) return;
+
+            // Créer des cœurs avec des positions et timings aléatoires
+            for (let i = 0; i < 15; i++) {
+                setTimeout(() => {
+                    createHeart();
+                }, i * 800);
+            }
+
+            // Créer un nouveau cœur toutes les 3 secondes
+            setInterval(createHeart, 3000);
+        }
+
+        function createHeart() {
+            const heartsContainer = document.getElementById('floatingHearts');
+            if (!heartsContainer) return;
+
+            const heart = document.createElement('i');
+            heart.className = 'fas fa-heart floating-heart';
+            
+            // Position horizontale aléatoire
+            heart.style.left = Math.random() * 100 + '%';
+            
+            // Délai d'animation aléatoire
+            heart.style.animationDelay = Math.random() * 2 + 's';
+            
+            // Taille légèrement variable
+            const size = 16 + Math.random() * 12;
+            heart.style.fontSize = size + 'px';
+
+            // Couleurs aléatoires romantiques
+            const colors = [
+                'rgba(255, 68, 88, 0.7)',
+                'rgba(255, 107, 129, 0.6)', 
+                'rgba(253, 80, 104, 0.5)',
+                'rgba(255, 138, 149, 0.7)',
+                'rgba(255, 255, 255, 0.6)'
+            ];
+            heart.style.color = colors[Math.floor(Math.random() * colors.length)];
+
+            heartsContainer.appendChild(heart);
+
+            // Supprimer le cœur après l'animation
+            setTimeout(() => {
+                if (heart.parentNode) {
+                    heart.parentNode.removeChild(heart);
+                }
+            }, 12000);
+        }
+
+        // Explosion de cœurs lors de la sauvegarde
+        document.querySelector('.btn-save').addEventListener('click', function() {
+            for (let i = 0; i < 8; i++) {
+                setTimeout(() => {
+                    createHeart();
+                }, i * 150);
+            }
+        });
+
+        // Explosion de cœurs lors de l'upload de photos
+        document.addEventListener('click', function(e) {
+            if (e.target.closest('.btn-photo-action') || e.target.closest('.photo-upload-slot')) {
+                for (let i = 0; i < 5; i++) {
+                    setTimeout(() => {
+                        createHeart();
+                    }, i * 100);
+                }
+            }
+        });
+
+        // Démarrer les cœurs au chargement
+        document.addEventListener('DOMContentLoaded', function() {
+            createFloatingHearts();        });
     </script>
+
+    <?php include 'includes/footer.php'; ?>
 </body>
 </html>

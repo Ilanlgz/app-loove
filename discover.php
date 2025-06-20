@@ -1,1194 +1,1179 @@
 <?php
-session_start();
+// Nettoyer tout buffer potentiel
+if (ob_get_level()) ob_end_clean();
+ob_start();
 
-if(!isset($_SESSION["loggedin"]) || $_SESSION["loggedin"] !== true){
+if (session_status() === PHP_SESSION_NONE) {
+    session_start();
+}
+
+// Vérification de l'authentification
+if (!isset($_SESSION["loggedin"]) || $_SESSION["loggedin"] !== true) {
     header("location: login.php");
     exit;
 }
 
-// Créer les tables de messages si elles n'existent pas
 require_once 'config/database.php';
+require_once 'classes/Match.php';
+require_once 'classes/User.php';
+
+// Récupération des profils
+$conn = getDbConnection();
+$matchSystem = new MatchSystem();
+$userSystem = new UserSystem($conn);
+
+// Récupérer les vrais utilisateurs du site
 try {
-    $conn = getDbConnection();
+    // Utiliser d'abord la méthode de la classe MatchSystem
+    $real_users = $matchSystem->getDiscoverUsers($_SESSION["user_id"], 10);
     
-    // Table des conversations
-    $conversationsQuery = "CREATE TABLE IF NOT EXISTS conversations (
-        id INT AUTO_INCREMENT PRIMARY KEY,
-        user1_id INT NOT NULL,
-        user2_id INT NOT NULL,
-        last_message TEXT,
-        last_message_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-        INDEX idx_user1 (user1_id),
-        INDEX idx_user2 (user2_id),
-        UNIQUE KEY unique_conversation (user1_id, user2_id)
-    )";
+    // Si pas de résultats, essayer une requête directe
+    if (empty($real_users)) {
+        $stmt = $conn->prepare("
+            SELECT id, first_name, last_name, profile_picture, bio, email, created_at,
+                   gender, location, last_active
+            FROM users 
+            WHERE id != ? 
+            AND (role IS NULL OR role != 'admin')
+            ORDER BY created_at DESC 
+            LIMIT 10
+        ");
+        $stmt->execute([$_SESSION["user_id"]]);
+        $real_users = $stmt->fetchAll(PDO::FETCH_ASSOC);
+    }
     
-    // Table des messages
-    $messagesQuery = "CREATE TABLE IF NOT EXISTS messages (
-        id INT AUTO_INCREMENT PRIMARY KEY,
-        conversation_id INT NOT NULL,
-        from_user_id INT NOT NULL,
-        to_user_id INT NOT NULL,
-        message_text TEXT NOT NULL,
-        sent_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-        is_read BOOLEAN DEFAULT FALSE,
-        INDEX idx_conversation (conversation_id),
-        INDEX idx_from_user (from_user_id),
-        INDEX idx_to_user (to_user_id)
-    )";
-    
-    $conn->exec($conversationsQuery);
-    $conn->exec($messagesQuery);
-    
-} catch (PDOException $e) {
-    // Ignorer les erreurs de création de tables
+    // Convertir en format attendu par l'affichage
+    $user_profiles = [];
+    foreach ($real_users as $user) {
+        $user_profiles[] = [
+            'id' => $user['id'],
+            'first_name' => $user['first_name'],
+            'last_name' => $user['last_name'],
+            'age' => rand(20, 35),
+            'calculated_age' => rand(20, 35),
+            'gender' => $user['gender'] ?: 'Non spécifié',
+            'location' => $user['location'] ?: 'France',
+            'bio' => $user['bio'] ?: 'Utilisateur inscrit sur Loove - Découvrez son profil ! 💫',
+            'description' => $user['bio'] ?: 'Nouveau membre',
+            'last_active' => $user['last_active'] ?: date('Y-m-d H:i:s', strtotime('-' . rand(5, 120) . ' minutes')),
+            'profile_picture' => $user['profile_picture'],
+            'profile_pictures' => []
+        ];
+    }
+
+} catch (Exception $e) {
+    error_log("Erreur récupération utilisateurs: " . $e->getMessage());
+    $user_profiles = [];
 }
 
-require_once 'classes/Match.php';
+// Vérifier si l'utilisateur a un abonnement premium
+$isPremium = $userSystem->isPremiumUser($_SESSION["user_id"]);
 
-$matchSystem = new MatchSystem();
-$discover_users = $matchSystem->getDiscoverUsers($_SESSION["user_id"], 10);
+// Valeurs par défaut pour les profils
+$default_user_profile = [
+    'id' => 0, 
+    'first_name' => '', 
+    'last_name' => '',
+    'age' => '', 
+    'calculated_age' => '', 
+    'gender' => '',
+    'location' => '', 
+    'bio' => '', 
+    'description' => '', 
+    'last_active' => '',
+    'profile_picture' => '',
+    'profile_pictures' => []
+];
 ?>
-
 <!DOCTYPE html>
 <html lang="fr">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Découvrir - Loove</title>
-    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="assets/css/style.css">
+    <link rel="stylesheet" href="assets/css/navbar.css">
+    <link rel="stylesheet" href="assets/css/footer.css">
     <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="assets/css/hearts-background.css">
     <style>
-        :root {
-            --primary-color: #FF4458;
-            --secondary-color: #FD5068;
-            --text-primary: #2c2c2c;
-            --text-secondary: #8E8E93;
-            --background: #FAFAFA;
-            --white: #FFFFFF;
-            --success: #34C759;
-            --warning: #FF9500;
-        }
-
-        * { margin: 0; padding: 0; box-sizing: border-box; }
-
-        body {
-            font-family: 'Poppins', sans-serif;
-            background: var(--background);
-            color: var(--text-primary);
-        }
-
+        /* Styles spécifiques à la page discover */
+        /* Reset CSS pour éliminer tous les espaces par défaut */
+        body, html {
+            margin: 0;
+            padding: 0;
+        }        /* Header unifié avec taille cohérente - FORCE OVERRIDE */
         .header {
-            background: var(--white);
-            padding: 20px;
-            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
-            position: sticky;
-            top: 0;
-            z-index: 100;
+            background: linear-gradient(135deg, #FF4458, #FF6B81) !important;
+            backdrop-filter: blur(20px) !important;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.2) !important;
+            padding: 12px 0 !important;
+            position: sticky !important;
+            top: 0 !important;
+            z-index: 1000 !important;
+            box-shadow: 0 2px 20px rgba(0, 0, 0, 0.1) !important;
         }
 
         .nav-container {
-            max-width: 1200px;
-            margin: 0 auto;
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
+            max-width: 1400px !important;
+            margin: 0 auto !important;
+            padding: 0 24px !important;
+            display: flex !important;
+            justify-content: space-between !important;
+            align-items: center !important;
         }
 
         .logo {
-            font-size: 1.8rem;
-            font-weight: 700;
-            color: var(--primary-color);
-            text-decoration: none;
+            font-size: 22px !important;
+            font-weight: 700 !important;
+            color: white !important;
+            letter-spacing: 0.5px !important;
+            display: flex !important;
+            align-items: center !important;
+            text-decoration: none !important;
+            transition: opacity 0.3s ease !important;
+        }
+
+        .logo:hover {
+            opacity: 0.8 !important;
+        }
+
+        .logo i {
+            margin-right: 6px !important;
+            font-size: 20px !important;
         }
 
         .nav-menu {
-            display: flex;
-            gap: 30px;
-            align-items: center;
+            display: flex !important;
+            align-items: center !important;
+            gap: 8px !important;
         }
 
         .nav-link {
-            color: var(--text-primary);
-            text-decoration: none;
-            font-weight: 500;
-            padding: 10px 15px;
-            border-radius: 8px;
-            transition: all 0.3s ease;
+            display: flex !important;
+            align-items: center !important;
+            gap: 6px !important;
+            padding: 8px 16px !important;
+            color: rgba(255, 255, 255, 0.9) !important;
+            text-decoration: none !important;
+            border-radius: 8px !important;
+            font-weight: 500 !important;
+            transition: all 0.3s ease !important;
+            position: relative !important;
+            font-size: 14px !important;
         }
 
-        .nav-link:hover, .nav-link.active {
-            color: var(--primary-color);
-            background: rgba(255, 68, 88, 0.1);
+        .nav-link:hover {
+            background: rgba(255, 255, 255, 0.15) !important;
+            color: white !important;
+            transform: translateY(-2px) !important;
+        }
+
+        .nav-link.active {
+            background: rgba(255, 255, 255, 0.25) !important;
+            color: white !important;
+            box-shadow: 0 4px 12px rgba(255, 255, 255, 0.2) !important;
+        }
+
+        .nav-link i {
+            font-size: 16px !important;
+            width: 16px !important;
+            text-align: center !important;
+        }
+
+        .user-info {
+            display: flex !important;
+            align-items: center !important;
+            gap: 12px !important;
+            margin-left: 20px !important;
+            padding-left: 20px !important;
+            border-left: 1px solid rgba(255, 255, 255, 0.3) !important;
+        }
+
+        .user-avatar {
+            width: 32px !important;
+            height: 32px !important;
+            background: white !important;
+            border-radius: 50% !important;
+            display: flex !important;
+            align-items: center !important;
+            justify-content: center !important;
+            color: #FF4458 !important;
+            font-weight: 600 !important;
+            font-size: 14px !important;
+        }
+
+        .user-info span {
+            font-weight: 500 !important;
+            color: white !important;
         }
 
         .btn-logout {
-            background: linear-gradient(135deg, var(--primary-color), var(--secondary-color));
-            color: var(--white);
-            padding: 10px 20px;
-            border: none;
-            border-radius: 8px;
-            text-decoration: none;
-            font-weight: 600;
+            display: flex !important;
+            align-items: center !important;
+            gap: 6px !important;
+            padding: 6px 12px !important;
+            background: rgba(255, 255, 255, 0.15) !important;
+            color: white !important;
+            text-decoration: none !important;
+            border-radius: 6px !important;
+            font-weight: 500 !important;
+            transition: all 0.3s ease !important;
+            font-size: 13px !important;
         }
 
-        .main-content {
-            max-width: 600px;
-            margin: 40px auto;
-            padding: 0 20px;
+        .btn-logout:hover {
+            background: white !important;
+            color: #FF4458 !important;
+            transform: translateY(-2px) !important;
+            box-shadow: 0 4px 12px rgba(255, 255, 255, 0.3) !important;
         }
 
+        /* Responsive navbar */
+        @media (max-width: 768px) {
+            .nav-container {
+                padding: 0 16px !important;
+            }
+            
+            .user-info span {
+                display: none !important;
+            }
+            
+            .nav-link {
+                padding: 6px 12px !important;
+                font-size: 13px !important;
+            }
+        }
+        
+        /* CSS pour la page discover */
         .discover-container {
+            max-width: 500px;
+            margin: 30px auto;
+            height: calc(100vh - 180px);
             position: relative;
-            height: 600px;
-            display: flex;
-            justify-content: center;
-            align-items: center;
         }
-
-        .card-stack {
-            position: relative;
+        
+        .discover-stack {
             width: 100%;
-            max-width: 400px;
-            height: 600px;
+            height: 100%;
+            position: relative;
         }
-
-        .profile-card {
+        
+        .user-card {
             position: absolute;
             width: 100%;
             height: 100%;
-            background: var(--white);
+            background: white;
             border-radius: 20px;
-            box-shadow: 0 16px 32px rgba(0,0,0,0.15);
+            box-shadow: 0 10px 30px rgba(0,0,0,0.15);
             overflow: hidden;
-            cursor: grab;
-            transition: transform 0.3s ease;
+            transition: transform 0.5s ease, opacity 0.5s ease;
+            transform-origin: center center;
         }
-
-        .profile-card:nth-child(2) {
+        
+        .user-card.hidden {
+            display: none;
+        }
+        
+        .user-card.active {
+            z-index: 10;
+        }
+        
+        .user-card.next {
+            z-index: 9;
             transform: scale(0.95) translateY(10px);
-            z-index: 1;
+            opacity: 0.8;
         }
-
-        .profile-card:nth-child(3) {
+        
+        .user-card.nextnext {
+            z-index: 8;
             transform: scale(0.9) translateY(20px);
-            z-index: 0;
+            opacity: 0.6;
         }
-
-        .profile-card.active {
-            z-index: 2;
+        
+        .user-card.swiped-left {
+            animation: swipeLeft 0.6s forwards;
         }
-
-        .card-image-gallery {
-            height: 60%;
+        
+        .user-card.swiped-right {
+            animation: swipeRight 0.6s forwards;
+        }
+        
+        .user-card.swiped-up {
+            animation: swipeUp 0.6s forwards;
+        }
+        
+        @keyframes swipeLeft {
+            to { transform: translateX(-200%) rotate(-30deg); opacity: 0; }
+        }
+        
+        @keyframes swipeRight {
+            to { transform: translateX(200%) rotate(30deg); opacity: 0; }
+        }
+        
+        @keyframes swipeUp {
+            to { transform: translateY(-200%) scale(0.8); opacity: 0; }
+        }
+        
+        .user-photos {
+            width: 100%;
+            height: 70%;
             position: relative;
-            overflow: hidden;
-            border-radius: 20px 20px 0 0;
         }
-
-        .card-image {
+        
+        .swiper {
+            width: 100%;
+            height: 100%;
+        }
+        
+        .swiper-slide {
+            background-position: center;
+            background-size: cover;
+        }
+        
+        .photo-overlay {
             position: absolute;
             top: 0;
             left: 0;
             width: 100%;
             height: 100%;
-            opacity: 0;
-            transition: all 0.5s ease;
-            background: linear-gradient(135deg, var(--primary-color), var(--secondary-color));
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            color: var(--white);
-            font-size: 4rem;
-            font-weight: 600;
+            background: linear-gradient(to bottom, rgba(0,0,0,0.1), rgba(0,0,0,0.5));
+            z-index: 1;
         }
-
-        .card-image.active {
-            opacity: 1;
+        
+        .user-details {
+            position: relative;
+            padding: 20px;
+            background: white;
+            height: 30%;
+            overflow-y: auto;
         }
-
-        .photo-navigation {
-            position: absolute;
-            top: 50%;
-            left: 0;
-            right: 0;
-            transform: translateY(-50%);
-            display: flex;
-            justify-content: space-between;
-            padding: 0 15px;
-            opacity: 0;
-            transition: opacity 0.3s ease;
-            z-index: 10;
-        }
-
-        .profile-card:hover .photo-navigation {
-            opacity: 1;
-        }
-
-        .nav-btn {
-            background: rgba(0,0,0,0.6);
-            color: var(--white);
-            border: none;
-            border-radius: 50%;
-            width: 40px;
-            height: 40px;
-            cursor: pointer;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            transition: all 0.3s ease;
-            backdrop-filter: blur(10px);
-        }
-
-        .nav-btn:hover {
-            background: rgba(0,0,0,0.8);
-            transform: scale(1.1);
-        }
-
-        .photo-indicators {
+        
+        .user-status {
             position: absolute;
             top: 15px;
-            left: 50%;
-            transform: translateX(-50%);
+            right: 15px;
+            font-size: 14px;
+            color: white;
+            background-color: rgba(0,0,0,0.5);
+            padding: 5px 10px;
+            border-radius: 20px;
+            z-index: 2;
             display: flex;
-            gap: 6px;
-            z-index: 10;
+            align-items: center;
         }
-
-        .indicator {
+        
+        .user-status::before {
+            content: '';
+            display: inline-block;
             width: 8px;
             height: 8px;
             border-radius: 50%;
-            background: rgba(255,255,255,0.5);
-            transition: all 0.3s ease;
+            margin-right: 5px;
+            background: #ccc;
+        }
+        
+        .user-status.online::before {
+            background: #4CAF50;
+        }
+        
+        .user-details h2 {
+            margin: 0 0 5px 0;
+            font-size: 24px;
+            font-weight: 700;
+            color: #333;
+        }
+        
+        .user-location {
+            display: flex;
+            align-items: center;
+            margin-bottom: 10px;
+            font-size: 15px;
+            color: #777;
+        }
+        
+        .user-location i {
+            color: #FF4458;
+            margin-right: 5px;
+        }
+        
+        .user-bio {
+            font-size: 14px;
+            color: #555;
+            line-height: 1.5;
+            margin-bottom: 15px;
+        }
+        
+        .user-actions {
+            position: absolute;
+            bottom: 15px;
+            left: 0;
+            width: 100%;
+            display: flex;
+            justify-content: center;
+            gap: 30px;
+            z-index: 20;
+        }
+        
+        .action-button {
+            width: 65px;
+            height: 65px;
+            border-radius: 50%;
+            border: none;
+            display: flex;
+            align-items: center;
+            justify-content: center;
             cursor: pointer;
-            border: 1px solid rgba(255,255,255,0.3);
+            transition: transform 0.2s ease, box-shadow 0.2s ease;
+            background: white;
+            box-shadow: 0 5px 15px rgba(0,0,0,0.2);
         }
-
-        .indicator.active {
-            background: var(--white);
-            transform: scale(1.3);
-            box-shadow: 0 0 8px rgba(255,255,255,0.5);
+        
+        .action-button:hover {
+            transform: translateY(-5px);
+            box-shadow: 0 10px 20px rgba(0,0,0,0.2);
         }
-
-        .indicator:hover {
-            background: rgba(255,255,255,0.8);
-            transform: scale(1.1);
+        
+        .action-button.dislike {
+            color: #FF4458;
         }
-
-        .no-more-cards {
+        
+        .action-button.dislike i {
+            font-size: 30px;
+        }
+        
+        .action-button.like {
+            background: #FF4458;
+            color: white;
+        }
+        
+        .action-button.like i {
+            font-size: 30px;
+        }
+        
+        .action-button.superlike {
+            background: #00D1FF;
+            color: white;
+            opacity: <?= $isPremium ? '1' : '0.5' ?>;
+            cursor: <?= $isPremium ? 'pointer' : 'not-allowed' ?>;
+        }
+        
+        .action-button.superlike i {
+            font-size: 24px;
+        }
+          .premium-badge {
+            position: absolute;
+            top: 15px;
+            left: 15px;
+            background: linear-gradient(135deg, #FFD700, #FFA500);
+            color: white;
+            padding: 5px 10px;
+            border-radius: 20px;
+            font-weight: 600;
+            font-size: 12px;
+            z-index: 2;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.2);
+            display: <?= $isPremium ? 'flex' : 'none' ?>;
+            align-items: center;
+        }
+        
+        .demo-badge {
+            position: absolute;
+            top: 15px;
+            right: 15px;
+            background: linear-gradient(135deg, #4CAF50, #45a049);
+            color: white;
+            padding: 5px 10px;
+            border-radius: 20px;
+            font-weight: 600;
+            font-size: 12px;
+            z-index: 2;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.2);
+            display: flex;
+            align-items: center;
+        }
+        
+        .demo-badge i {
+            margin-right: 5px;
+        }
+        
+        .premium-badge i {
+            margin-right: 5px;
+        }
+        
+        .no-more-users {
             text-align: center;
-            padding: 100px 20px;
-            color: var(--text-secondary);
+            padding: 50px 20px;
+            background: white;
+            border-radius: 20px;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.1);
+            height: 100%;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
         }
-
-        .no-more-cards i {
-            font-size: 4rem;
-            margin-bottom: 20px;
-            color: var(--primary-color);
+        
+        .no-more-users i {
+            font-size: 80px;
+            color: #FF4458;
+            margin-bottom: 30px;
         }
-
-        .match-popup {
+        
+        .no-more-users h2 {
+            margin: 0 0 20px;
+            color: #333;
+            font-size: 28px;
+        }
+        
+        .no-more-users p {
+            color: #666;
+            font-size: 16px;
+            max-width: 300px;
+            margin: 0 auto;
+        }
+        
+        .keyboard-shortcuts {
+            position: absolute;
+            bottom: 15px;
+            right: 15px;
+            color: #999;
+            font-size: 12px;
+            z-index: 2;
+        }
+        
+        .toast {
+            position: fixed;
+            top: 80px;
+            left: 50%;
+            transform: translateX(-50%);
+            background-color: rgba(0,0,0,0.75);
+            color: white;
+            padding: 12px 25px;
+            border-radius: 50px;
+            z-index: 9999;
+            opacity: 0;
+            transition: opacity 0.3s ease;
+            font-weight: 500;
+        }
+        
+        .toast.show {
+            opacity: 1;
+        }
+          .toast.match {
+            background-color: rgba(255, 68, 88, 0.9);
+            padding: 15px 30px;
+            font-weight: 600;
+            box-shadow: 0 5px 20px rgba(255, 68, 88, 0.4);
+        }
+        
+        /* Modal de match */
+        .match-modal {
             position: fixed;
             top: 0;
             left: 0;
             width: 100%;
             height: 100%;
-            background: rgba(0,0,0,0.8);
+            background: rgba(0, 0, 0, 0.8);
             display: none;
-            justify-content: center;
             align-items: center;
-            z-index: 1000;
+            justify-content: center;
+            z-index: 10000;
+            animation: fadeIn 0.3s ease;
         }
-
+        
+        .match-modal.show {
+            display: flex;
+        }
+        
+        @keyframes fadeIn {
+            from { opacity: 0; }
+            to { opacity: 1; }
+        }
+        
         .match-content {
-            background: var(--white);
-            padding: 50px;
+            background: white;
             border-radius: 20px;
+            padding: 40px;
             text-align: center;
             max-width: 400px;
-            animation: matchPop 0.5s ease;
+            width: 90%;
+            position: relative;
+            animation: slideUp 0.4s ease;
         }
-
-        @keyframes matchPop {
-            0% { transform: scale(0.5); opacity: 0; }
-            100% { transform: scale(1); opacity: 1; }
+        
+        @keyframes slideUp {
+            from { transform: translateY(50px); opacity: 0; }
+            to { transform: translateY(0); opacity: 1; }
         }
-
+        
+        .match-hearts {
+            font-size: 60px;
+            color: #FF4458;
+            margin-bottom: 20px;
+            animation: heartBeat 1s ease infinite;
+        }
+        
+        @keyframes heartBeat {
+            0%, 100% { transform: scale(1); }
+            50% { transform: scale(1.1); }
+        }
+        
         .match-title {
-            font-size: 2rem;
-            color: var(--primary-color);
+            font-size: 28px;
+            font-weight: 700;
+            color: #FF4458;
+            margin-bottom: 10px;
+        }
+        
+        .match-subtitle {
+            font-size: 16px;
+            color: #666;
             margin-bottom: 20px;
         }
-
-        .btn-continue {
-            background: linear-gradient(135deg, var(--primary-color), var(--secondary-color));
-            color: var(--white);
-            padding: 15px 30px;
-            border: none;
-            border-radius: 12px;
-            font-weight: 600;
-            cursor: pointer;
-            margin-top: 20px;
-        }
-
-        /* Animation de chargement */
-        .spinner {
-            width: 40px;
-            height: 40px;
-            border: 4px solid #f3f3f3;
-            border-top: 4px solid var(--primary-color);
-            border-radius: 50%;
-            animation: spin 1s linear infinite;
-            margin: 0 auto;
-        }
-
-        @keyframes spin {
-            0% { transform: rotate(0deg); }
-            100% { transform: rotate(360deg); }
-        }
-
-        /* Transitions fluides pour les cartes */
-        .profile-card {
-            transition: transform 0.2s ease-out, opacity 0.2s ease-out;
-        }
-
-        .profile-card:hover {
-            transform: translateY(-5px);
-            box-shadow: 0 20px 40px rgba(0,0,0,0.2);
-        }
-
-        /* Animation des boutons d'action */
-        .action-btn {
-            transition: all 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275);
-        }
-
-        .action-btn:active {
-            transform: scale(0.95);
-        }
-
-        .action-buttons {
-            display: flex;
-            justify-content: center;
-            gap: 30px;
-            margin-top: 30px;
-        }
-
-        .action-btn {
-            width: 60px;
-            height: 60px;
-            border-radius: 50%;
-            border: none;
-            cursor: pointer;
+        
+        .matched-user {
             display: flex;
             align-items: center;
             justify-content: center;
-            font-size: 1.5rem;
-            transition: all 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275);
-            box-shadow: 0 8px 16px rgba(0,0,0,0.1);
+            gap: 20px;
+            margin-bottom: 30px;
         }
-
-        .btn-pass {
-            background: var(--white);
-            color: var(--text-secondary);
-            border: 2px solid var(--text-secondary);
+        
+        .matched-avatar {
+            width: 80px;
+            height: 80px;
+            border-radius: 50%;
+            overflow: hidden;
+            border: 3px solid #FF4458;
         }
-
-        .btn-like {
-            background: linear-gradient(135deg, var(--primary-color), var(--secondary-color));
-            color: var(--white);
+        
+        .matched-avatar img {
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
         }
-
-        .btn-super-like {
-            background: linear-gradient(135deg, #007AFF, #5AC8FA);
-            color: var(--white);
+        
+        .matched-avatar .default-avatar {
+            width: 100%;
+            height: 100%;
+            background: linear-gradient(135deg, #FF4458, #FF6B81);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: white;
+            font-size: 30px;
+            font-weight: 700;
         }
-
-        .action-btn:hover {
-            transform: scale(1.1);
+        
+        .match-vs {
+            font-size: 24px;
+            color: #FF4458;
+            font-weight: 700;
         }
-
-        .action-btn:active {
-            transform: scale(0.95);
+        
+        .matched-name {
+            font-size: 18px;
+            font-weight: 600;
+            color: #333;
+            margin-top: 10px;
         }
-
-        /* Amélioration de l'affichage mobile */
+        
+        .match-actions {
+            display: flex;
+            gap: 15px;
+            justify-content: center;
+        }
+        
+        .btn-start-chat {
+            background: linear-gradient(135deg, #FF4458, #FF6B81);
+            color: white;
+            padding: 12px 24px;
+            border-radius: 12px;
+            text-decoration: none;
+            font-weight: 600;
+            transition: transform 0.3s ease;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+        
+        .btn-start-chat:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 8px 24px rgba(255, 68, 88, 0.3);
+        }
+        
+        .btn-continue {
+            background: transparent;
+            color: #666;
+            border: 2px solid #ddd;
+            padding: 10px 20px;
+            border-radius: 12px;
+            text-decoration: none;
+            font-weight: 500;
+            transition: all 0.3s ease;
+        }
+        
+        .btn-continue:hover {
+            border-color: #FF4458;
+            color: #FF4458;
+        }
+        
+        /* Ajustements pour mobile */
         @media (max-width: 768px) {
-            .main-content {
-                padding: 0 10px;
-            }
-            
             .discover-container {
-                height: 70vh;
+                height: calc(100vh - 150px);
+                margin: 20px 15px;
             }
             
-            .action-buttons {
-                gap: 20px;
-                margin-top: 20px;
+            .user-actions {
+                gap: 15px;
             }
             
-            .action-btn {
-                width: 50px;
-                height: 50px;
-                font-size: 1.2rem;
+            .action-button {
+                width: 55px;
+                height: 55px;
             }
         }
     </style>
 </head>
 <body>
-    <header class="header">
-        <div class="nav-container">
-            <a href="main.php" class="logo">
-                <i class="fas fa-heart"></i> Loove
-            </a>
-            <nav class="nav-menu">
-                <a href="discover.php" class="nav-link active">
-                    <i class="fas fa-search"></i> Découvrir
-                </a>
-                <a href="matches.php" class="nav-link">
-                    <i class="fas fa-heart"></i> Matches
-                </a>
-                <a href="messages.php" class="nav-link">
-                    <i class="fas fa-comments"></i> Messages
-                </a>
-                <a href="profile.php" class="nav-link">
-                    <i class="fas fa-user"></i> Profil
-                </a>
-                <a href="logout.php" class="btn-logout">
-                    <i class="fas fa-sign-out-alt"></i> Déconnexion
-                </a>
-            </nav>
-        </div>
-    </header>
+    <!-- Container des coeurs flottants -->
+    <div class="hearts-container">
+        <i class="fas fa-heart heart"></i>
+        <i class="fas fa-heart heart"></i>
+        <i class="fas fa-heart heart"></i>
+        <i class="fas fa-heart heart"></i>
+        <i class="fas fa-heart heart"></i>
+        <i class="fas fa-heart heart"></i>
+        <i class="fas fa-heart heart"></i>
+        <i class="fas fa-heart heart"></i>
+        <i class="fas fa-heart heart"></i>
+        <i class="fas fa-heart heart"></i>
+    </div>
 
-    <main class="main-content">
-        <div class="discover-container">
-            <?php if (empty($discover_users)): ?>
-                <div class="no-more-cards">
-                    <i class="fas fa-heart-broken"></i>
-                    <h2>Plus de profils !</h2>
-                    <p>Revenez plus tard pour découvrir de nouveaux profils</p>
-                </div>
-            <?php else: ?>
-                <div class="card-stack" id="cardStack">
-                    <?php foreach ($discover_users as $index => $user): ?>
-                        <div class="profile-card <?php echo $index === 0 ? 'active' : ''; ?>" data-user-id="<?php echo $user['id']; ?>">
-                            <div class="card-image-gallery">
-                                <?php 
-                                $user_photos = [];
-                                if (isset($user['photos']) && $user['photos']) {
-                                    $user_photos = explode(',', $user['photos']);
-                                }
-                                if (empty($user_photos) && $user['profile_picture']) {
-                                    $user_photos = [$user['profile_picture']];
-                                }
-                                if (empty($user_photos)) {
-                                    $user_photos = ['default']; // Pour l'avatar par défaut
-                                }
-                                ?>
-                                
-                                <?php foreach ($user_photos as $photo_index => $photo): ?>
-                                    <div class="card-image <?php echo $photo_index === 0 ? 'active' : ''; ?>" data-photo="<?php echo $photo_index; ?>">
-                                        <?php if ($photo === 'default'): ?>
-                                            <div class="avatar-placeholder">
-                                                <?php echo strtoupper(substr($user['first_name'], 0, 1)); ?>
-                                            </div>
-                                        <?php else: ?>
-                                            <img src="uploads/profiles/<?php echo htmlspecialchars($photo); ?>" alt="<?php echo htmlspecialchars($user['first_name']); ?>" style="width: 100%; height: 100%; object-fit: cover;">
-                                        <?php endif; ?>
-                                    </div>
-                                <?php endforeach; ?>
-                                
-                                <?php if (count($user_photos) > 1): ?>
-                                    <div class="photo-navigation">
-                                        <button class="nav-btn nav-prev" onclick="previousPhoto(this)">
-                                            <i class="fas fa-chevron-left"></i>
-                                        </button>
-                                        <button class="nav-btn nav-next" onclick="nextPhoto(this)">
-                                            <i class="fas fa-chevron-right"></i>
-                                        </button>
-                                    </div>
-                                    
-                                    <div class="photo-indicators">
-                                        <?php for ($i = 0; $i < count($user_photos); $i++): ?>
-                                            <div class="indicator <?php echo $i === 0 ? 'active' : ''; ?>" data-photo="<?php echo $i; ?>" onclick="goToPhoto(this, <?php echo $i; ?>)"></div>
-                                        <?php endfor; ?>
-                                    </div>
-                                <?php endif; ?>
-                                
-                                <?php if ($user['is_premium']): ?>
-                                    <div class="premium-badge">
-                                        <i class="fas fa-crown"></i>
-                                    </div>
-                                <?php endif; ?>
-                                
-                                <div class="online-status <?php echo (strtotime($user['last_active']) > strtotime('-5 minutes')) ? 'online' : 'offline'; ?>"></div>
-                            </div>
-                            <div class="card-info">
-                                <div>
-                                    <div class="card-name">
-                                        <?php echo htmlspecialchars($user['first_name'] . ' ' . substr($user['last_name'], 0, 1) . '.'); ?>, 
-                                        <?php echo $user['calculated_age'] ?: $user['age'] ?: '25'; ?>
-                                        <?php if ($user['gender']): ?>
-                                            <span class="gender-icon">
-                                                <?php echo $user['gender'] === 'male' ? '♂️' : ($user['gender'] === 'female' ? '♀️' : '⚧️'); ?>
-                                            </span>
-                                        <?php endif; ?>
-                                    </div>
-                                    <div class="card-details">
-                                        <?php if ($user['location']): ?>
-                                            <div class="detail-item">
-                                                <i class="fas fa-map-marker-alt"></i> 
-                                                <?php echo htmlspecialchars($user['location']); ?>
-                                            </div>
-                                        <?php endif; ?>
-                                        
-                                        <?php if ($user['occupation']): ?>
-                                            <div class="detail-item">
-                                                <i class="fas fa-briefcase"></i> 
-                                                <?php echo htmlspecialchars($user['occupation']); ?>
-                                            </div>
-                                        <?php endif; ?>
-                                        
-                                        <?php if ($user['height']): ?>
-                                            <div class="detail-item">
-                                                <i class="fas fa-ruler-vertical"></i> 
-                                                <?php echo htmlspecialchars($user['height']); ?> cm
-                                            </div>
-                                        <?php endif; ?>
-                                        
-                                        <?php if ($user['relationship_status']): ?>
-                                            <div class="detail-item">
-                                                <i class="fas fa-heart"></i> 
-                                                <?php echo htmlspecialchars(ucfirst($user['relationship_status'])); ?>
-                                            </div>
-                                        <?php endif; ?>
-                                    </div>
-                                </div>
-                                
-                                <?php if ($user['bio']): ?>
-                                    <div class="card-bio">
-                                        "<?php echo htmlspecialchars(substr($user['bio'], 0, 120)) . (strlen($user['bio']) > 120 ? '...' : ''); ?>"
-                                    </div>
-                                <?php endif; ?>
-                                
-                                <?php if ($user['interests']): ?>
-                                    <div class="card-interests">
-                                        <?php 
-                                        $interests = explode(',', $user['interests']);
-                                        foreach (array_slice($interests, 0, 3) as $interest): 
-                                        ?>
-                                            <span class="interest-tag"><?php echo htmlspecialchars(trim($interest)); ?></span>
-                                        <?php endforeach; ?>
-                                        <?php if (count($interests) > 3): ?>
-                                            <span class="interest-tag more">+<?php echo count($interests) - 3; ?></span>
-                                        <?php endif; ?>
-                                    </div>
-                                <?php endif; ?>
-                            </div>
+    <?php include 'includes/navbar.php'; ?>
+    
+    <div class="discover-container">
+        <?php if (empty($user_profiles)) { ?>
+            <div class="no-more-users">
+                <i class="fas fa-users-slash"></i>
+                <h2>Plus de profils disponibles pour le moment</h2>
+                <p>Revenez plus tard ou modifiez vos critères de recherche</p>
+            </div>
+        <?php } else { ?>
+            <div class="discover-stack">
+                <?php 
+                // Classes pour les cartes
+                $cardClasses = ['active', 'next', 'nextnext'];
+                
+                foreach ($user_profiles as $index => $user_profile) { 
+                    $user_profile = array_merge($default_user_profile, $user_profile);
+                    $cardClass = $index < 3 ? $cardClasses[$index] : 'hidden';
+                    
+                    // Récupérer les photos supplémentaires si disponibles
+                    $profile_pictures = [];
+                    if (!empty($user_profile['profile_picture'])) {
+                        $profile_pictures[] = $user_profile['profile_picture'];
+                    }
+                    
+                    if (!empty($user_profile['profile_pictures']) && is_array($user_profile['profile_pictures'])) {
+                        $profile_pictures = array_merge($profile_pictures, $user_profile['profile_pictures']);
+                    }
+                    
+                    // Si aucune photo, utiliser une image par défaut
+                    if (empty($profile_pictures)) {
+                        $profile_pictures[] = 'assets/img/default-profile.jpg';
+                    }
+                ?>
+                <div class="user-card <?php echo $cardClass; ?>" data-user-id="<?php echo $user_profile['id']; ?>">                    <?php if ($isPremium) { ?>
+                        <div class="premium-badge">
+                            <i class="fas fa-crown"></i> Premium
                         </div>
-                    <?php endforeach; ?>
+                    <?php } ?>
+                    
+                    <div class="user-status <?php echo (isset($user_profile['last_active']) && (time() - strtotime($user_profile['last_active']) < 600)) ? 'online' : ''; ?>">
+                        <?php echo (isset($user_profile['last_active']) && (time() - strtotime($user_profile['last_active']) < 600)) ? 'En ligne' : 'Hors ligne'; ?>
+                    </div>
+                    
+                    <div class="user-photos">
+                        <div class="swiper">
+                            <div class="swiper-wrapper">
+                                <?php foreach ($profile_pictures as $photo) { ?>
+                                    <div class="swiper-slide" style="background-image: url('<?php echo htmlspecialchars(strpos($photo, 'http') === 0 ? $photo : 'uploads/profiles/' . $photo); ?>')"></div>
+                                <?php } ?>
+                            </div>
+                            <div class="swiper-pagination"></div>
+                        </div>
+                        <div class="photo-overlay"></div>
+                    </div>
+                    
+                    <div class="user-details">
+                        <h2>
+                            <?php echo htmlspecialchars($user_profile['first_name']); ?> 
+                            <?php echo htmlspecialchars($user_profile['last_name'] ? substr($user_profile['last_name'], 0, 1) . '.' : ''); ?>, 
+                            <?php 
+                            echo isset($user_profile['age']) ? htmlspecialchars($user_profile['age']) : 
+                                (isset($user_profile['calculated_age']) ? htmlspecialchars($user_profile['calculated_age']) : '?'); 
+                            ?>
+                        </h2>
+                        
+                        <div class="user-location">
+                            <i class="fas fa-map-marker-alt"></i> 
+                            <?php echo htmlspecialchars($user_profile['location'] ?? ''); ?>
+                        </div>
+                        
+                        <div class="user-bio">
+                            <?php echo htmlspecialchars($user_profile['bio'] ?? ($user_profile['description'] ?? '')); ?>
+                        </div>
+                    </div>
                 </div>
-            <?php endif; ?>
-        </div>
-
-        <?php if (!empty($discover_users)): ?>
-            <div class="action-buttons">
-                <button class="action-btn btn-pass" onclick="performAction('pass')">
+                <?php } ?>
+            </div>
+            
+            <div class="user-actions">
+                <button class="action-button dislike">
                     <i class="fas fa-times"></i>
                 </button>
-                <button class="action-btn btn-super-like" onclick="performAction('super_like')">
+                <button class="action-button superlike" <?php echo !$isPremium ? 'title="Fonction premium uniquement"' : ''; ?>>
                     <i class="fas fa-star"></i>
                 </button>
-                <button class="action-btn btn-like" onclick="performAction('like')">
+                <button class="action-button like">
                     <i class="fas fa-heart"></i>
                 </button>
             </div>
-        <?php endif; ?>
-    </main>
-
-    <!-- Match Popup -->
-    <div class="match-popup" id="matchPopup">
+            
+            <div class="keyboard-shortcuts">
+                ← Passer | Aimer →
+            </div>
+        <?php } ?>
+    </div>
+      <?php include 'includes/footer.php'; ?>
+    
+    <div class="toast" id="toast"></div>
+    
+    <!-- Modal de Match -->
+    <div class="match-modal" id="matchModal">
         <div class="match-content">
-            <h2 class="match-title">🎉 C'est un Match !</h2>
-            <p>Vous vous plaisez mutuellement ! Commencez une conversation.</p>
-            <button class="btn-continue" onclick="closeMatchPopup()">Continuer</button>
+            <div class="match-hearts">
+                <i class="fas fa-heart"></i>
+            </div>
+            <h2 class="match-title">C'est un Match ! 🎉</h2>
+            <p class="match-subtitle">Vous vous êtes plu mutuellement !</p>
+            
+            <div class="matched-user">
+                <div class="matched-avatar" id="currentUserAvatar">
+                    <div class="default-avatar">
+                        <?php echo strtoupper(substr($_SESSION["first_name"], 0, 1)); ?>
+                    </div>
+                </div>
+                <div class="match-vs">💕</div>
+                <div class="matched-avatar" id="matchedUserAvatar">
+                    <!-- L'avatar sera ajouté dynamiquement -->
+                </div>
+            </div>
+            
+            <div class="matched-name" id="matchedUserName">
+                <!-- Le nom sera ajouté dynamiquement -->
+            </div>
+            
+            <div class="match-actions">
+                <a href="#" class="btn-start-chat" id="startChatBtn">
+                    <i class="fas fa-comment"></i>
+                    Commencer à discuter
+                </a>
+                <a href="#" class="btn-continue" onclick="closeMatchModal()">
+                    Continuer à découvrir
+                </a>
+            </div>
         </div>
     </div>
 
+    <script src="https://cdn.jsdelivr.net/npm/swiper@10/swiper-bundle.min.js"></script>
     <script>
-        let currentCardIndex = 0;
-        let cards = document.querySelectorAll('.profile-card');
-        let isLoading = false;
-
-        function performAction(action) {
-            if (currentCardIndex >= cards.length || isLoading) return;
-
-            const currentCard = cards[currentCardIndex];
-            const userId = currentCard.dataset.userId;
-            
-            // Désactiver les boutons temporairement
-            document.querySelectorAll('.action-btn').forEach(btn => btn.style.pointerEvents = 'none');
-
-            // Animation fluide selon l'action
-            if (action === 'like' || action === 'super_like') {
-                // Animation swipe droite (like)
-                currentCard.style.transition = 'all 0.6s cubic-bezier(0.175, 0.885, 0.32, 1.275)';
-                currentCard.style.transform = 'translateX(120%) rotate(30deg) scale(0.8)';
-                currentCard.style.opacity = '0';
-                
-                // Effet de particules coeurs
-                createHeartParticles(currentCard);
-            } else {
-                // Animation swipe gauche (pass)
-                currentCard.style.transition = 'all 0.6s cubic-bezier(0.175, 0.885, 0.32, 1.275)';
-                currentCard.style.transform = 'translateX(-120%) rotate(-30deg) scale(0.8)';
-                currentCard.style.opacity = '0';
-            }
-
-            // Envoyer l'action au serveur
-            fetch('process_action.php', {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
+    document.addEventListener('DOMContentLoaded', function() {
+        // Initialiser le carrousel Swiper pour chaque carte
+        document.querySelectorAll('.user-card').forEach(function(card) {
+            new Swiper(card.querySelector('.swiper'), {
+                pagination: {
+                    el: card.querySelector('.swiper-pagination'),
                 },
-                body: JSON.stringify({
-                    action: action === 'super_like' ? 'like' : action,
-                    user_id: userId
-                })
-            })
-            .then(response => response.json())
-            .then(data => {
-                if (data.result === 'match') {
-                    setTimeout(() => showMatchPopup(), 400);
-                }
             });
-
-            // Animation de la carte suivante
-            setTimeout(() => {
-                currentCard.style.display = 'none';
-                currentCardIndex++;
-                
-                if (currentCardIndex < cards.length) {
-                    // Animer l'apparition de la nouvelle carte
-                    const nextCard = cards[currentCardIndex];
-                    nextCard.classList.add('active');
-                    nextCard.style.transform = 'scale(1.05)';
-                    nextCard.style.transition = 'all 0.4s ease-out';
-                    
-                    setTimeout(() => {
-                        nextCard.style.transform = 'scale(1)';
-                    }, 50);
-                    
-                    // Réactiver les boutons
-                    setTimeout(() => {
-                        document.querySelectorAll('.action-btn').forEach(btn => btn.style.pointerEvents = 'auto');
-                    }, 300);
-                } else {
-                    // Charger plus de profils
-                    loadMoreProfiles();
-                }
-            }, 600);
-        }
-
-        function createHeartParticles(card) {
-            const rect = card.getBoundingClientRect();
-            const centerX = rect.left + rect.width / 2;
-            const centerY = rect.top + rect.height / 2;
+        });
+          // Fonction pour afficher un toast
+        function showToast(message, isMatch = false) {
+            const toast = document.getElementById('toast');
+            toast.textContent = message;
             
-            for (let i = 0; i < 8; i++) {
+            if (isMatch) {
+                toast.classList.add('match');
+            } else {
+                toast.classList.remove('match');
+            }
+            
+            toast.classList.add('show');
+            
+            setTimeout(() => {
+                toast.classList.remove('show');
+            }, 3000);
+        }
+        
+        // Fonction pour afficher le modal de match
+        function showMatchModal(matchedUser, redirectUrl) {
+            const modal = document.getElementById('matchModal');
+            const matchedUserAvatar = document.getElementById('matchedUserAvatar');
+            const matchedUserName = document.getElementById('matchedUserName');
+            const startChatBtn = document.getElementById('startChatBtn');
+            
+            // Mettre à jour les informations de l'utilisateur matché
+            if (matchedUser.profile_picture) {
+                matchedUserAvatar.innerHTML = `<img src="uploads/profiles/${matchedUser.profile_picture}" alt="${matchedUser.first_name}">`;
+            } else {
+                matchedUserAvatar.innerHTML = `<div class="default-avatar">${matchedUser.first_name.charAt(0).toUpperCase()}</div>`;
+            }
+            
+            matchedUserName.textContent = `${matchedUser.first_name} ${matchedUser.last_name}`;
+            startChatBtn.href = redirectUrl;
+            
+            // Afficher le modal
+            modal.classList.add('show');
+            
+            // Ajouter des confettis d'animation
+            createConfetti();
+        }
+        
+        // Fonction pour fermer le modal de match
+        function closeMatchModal() {
+            const modal = document.getElementById('matchModal');
+            modal.classList.remove('show');
+            showNextCard();
+        }
+        
+        // Fonction pour créer des confettis
+        function createConfetti() {
+            const colors = ['#FF4458', '#FF6B81', '#FFD700', '#FFA500', '#FF69B4'];
+            const confettiCount = 50;
+            
+            for (let i = 0; i < confettiCount; i++) {
                 setTimeout(() => {
-                    const heart = document.createElement('div');
-                    heart.innerHTML = '❤️';
-                    heart.style.position = 'fixed';
-                    heart.style.left = centerX + 'px';
-                    heart.style.top = centerY + 'px';
-                    heart.style.fontSize = '24px';
-                    heart.style.pointerEvents = 'none';
-                    heart.style.zIndex = '9999';
-                    heart.style.transition = 'all 1.5s ease-out';
+                    const confetti = document.createElement('div');
+                    confetti.style.position = 'fixed';
+                    confetti.style.width = '10px';
+                    confetti.style.height = '10px';
+                    confetti.style.backgroundColor = colors[Math.floor(Math.random() * colors.length)];
+                    confetti.style.left = Math.random() * 100 + '%';
+                    confetti.style.top = '-10px';
+                    confetti.style.zIndex = '10001';
+                    confetti.style.pointerEvents = 'none';
+                    confetti.style.animation = 'confettiFall 3s linear forwards';
                     
-                    document.body.appendChild(heart);
-                    
-                    setTimeout(() => {
-                        const angle = (i * 45) * Math.PI / 180;
-                        const distance = 150 + Math.random() * 100;
-                        heart.style.transform = `translate(${Math.cos(angle) * distance}px, ${Math.sin(angle) * distance}px) scale(0.5)`;
-                        heart.style.opacity = '0';
-                    }, 50);
+                    document.body.appendChild(confetti);
                     
                     setTimeout(() => {
-                        if (heart.parentNode) {
-                            heart.parentNode.removeChild(heart);
-                        }
-                    }, 1600);
-                }, i * 100);
+                        confetti.remove();
+                    }, 3000);
+                }, i * 50);
             }
         }
-
-        function loadMoreProfiles() {
-            if (isLoading) return;
-            isLoading = true;
+        
+        // Ajouter le CSS pour l'animation des confettis
+        const style = document.createElement('style');
+        style.textContent = `
+            @keyframes confettiFall {
+                to {
+                    transform: translateY(100vh) rotate(360deg);
+                    opacity: 0;
+                }
+            }
+        `;
+        document.head.appendChild(style);
+        
+        // Fonction pour passer à la carte suivante
+        function showNextCard() {
+            const currentCard = document.querySelector('.user-card.active');
+            const nextCard = document.querySelector('.user-card.next');
+            const nextNextCard = document.querySelector('.user-card.nextnext');
+            const hiddenCards = document.querySelectorAll('.user-card.hidden');
             
-            // Afficher un indicateur de chargement
-            const loadingIndicator = document.createElement('div');
-            loadingIndicator.className = 'loading-indicator';
-            loadingIndicator.innerHTML = `
-                <div style="text-align: center; padding: 50px;">
-                    <div class="spinner"></div>
-                    <p style="margin-top: 20px; color: var(--text-secondary);">Chargement de nouveaux profils...</p>
-                </div>
-            `;
-            document.querySelector('.discover-container').appendChild(loadingIndicator);
-
-            // Charger de nouveaux profils
-            fetch('load_more_profiles.php', {
+            if (currentCard) {
+                currentCard.remove();
+            }
+            
+            if (nextCard) {
+                nextCard.classList.remove('next');
+                nextCard.classList.add('active');
+            }
+            
+            if (nextNextCard) {
+                nextNextCard.classList.remove('nextnext');
+                nextNextCard.classList.add('next');
+            }
+            
+            if (hiddenCards.length > 0) {
+                hiddenCards[0].classList.remove('hidden');
+                hiddenCards[0].classList.add('nextnext');
+            }
+            
+            // Vérifier s'il reste des cartes
+            if (!document.querySelector('.user-card')) {
+                // Recharger la page pour obtenir plus de profils
+                window.location.reload();
+            }
+        }
+        
+        // Fonction pour gérer le like
+        function handleLike() {
+            const currentCard = document.querySelector('.user-card.active');
+            if (!currentCard) return;            const userId = currentCard.getAttribute('data-user-id');
+            currentCard.classList.add('swiped-right');
+            
+            fetch('ajax/like_user.php', {
                 method: 'POST',
                 headers: {
-                    'Content-Type': 'application/json',
+                    'Content-Type': 'application/x-www-form-urlencoded',
                 },
-                body: JSON.stringify({
-                    offset: currentCardIndex,
-                    limit: 10
-                })
-            })
-            .then(response => response.json())
+                body: 'user_id=' + userId
+            })            .then(response => response.json())
             .then(data => {
-                if (data.profiles && data.profiles.length > 0) {
-                    // Ajouter les nouveaux profils
-                    addNewProfiles(data.profiles);
-                    loadingIndicator.remove();
-                    
-                    // Activer la première nouvelle carte
-                    if (currentCardIndex < cards.length) {
-                        const nextCard = cards[currentCardIndex];
-                        nextCard.classList.add('active');
-                        nextCard.style.transform = 'scale(1.05)';
-                        nextCard.style.transition = 'all 0.4s ease-out';
-                        
-                        setTimeout(() => {
-                            nextCard.style.transform = 'scale(1)';
-                        }, 50);
-                    }
-                } else {
-                    // Plus de profils disponibles
-                    loadingIndicator.innerHTML = `
-                        <div class="no-more-cards">
-                            <i class="fas fa-heart-broken"></i>
-                            <h2>Plus de profils pour le moment !</h2>
-                            <p>Revenez plus tard pour découvrir de nouveaux profils</p>
-                            <button onclick="location.reload()" style="margin-top: 20px; padding: 10px 20px; background: var(--primary-color); color: white; border: none; border-radius: 8px; cursor: pointer;">
-                                🔄 Actualiser
-                            </button>
-                        </div>
-                    `;
-                    document.querySelector('.action-buttons').style.display = 'none';
+                if (data.match) {
+                    // C'est un match ! Afficher le modal de match
+                    showMatchModal(data.matched_user, data.redirect_url);
+                } else if (data.success) {
+                    showToast("Like envoyé ! 💖");
                 }
-                
-                // Réactiver les boutons
-                document.querySelectorAll('.action-btn').forEach(btn => btn.style.pointerEvents = 'auto');
-                isLoading = false;
             })
             .catch(error => {
                 console.error('Erreur:', error);
-                loadingIndicator.innerHTML = `
-                    <div style="text-align: center; color: var(--error);">
-                        ❌ Erreur de chargement
-                        <button onclick="loadMoreProfiles()" style="display: block; margin: 10px auto; padding: 8px 16px; background: var(--primary-color); color: white; border: none; border-radius: 6px; cursor: pointer;">
-                            Réessayer
-                        </button>
-                    </div>
-                `;
-                isLoading = false;
-            });
-        }
-
-        function addNewProfiles(profiles) {
-            const cardStack = document.getElementById('cardStack');
-            
-            profiles.forEach((user, index) => {
-                const card = document.createElement('div');
-                card.className = 'profile-card';
-                card.setAttribute('data-user-id', user.id);
-                
-                // Gérer les photos multiples
-                let user_photos = [];
-                if (user.photos) {
-                    user_photos = user.photos.split(',');
-                } else if (user.profile_picture) {
-                    user_photos = [user.profile_picture];
-                } else {
-                    user_photos = ['default'];
-                }
-                
-                // Créer la galerie d'images
-                let imagesHTML = '';
-                user_photos.forEach((photo, photoIndex) => {
-                    if (photo === 'default') {
-                        imagesHTML += `
-                            <div class="card-image ${photoIndex === 0 ? 'active' : ''}" data-photo="${photoIndex}">
-                                <div class="avatar-placeholder">${user.first_name.charAt(0).toUpperCase()}</div>
-                            </div>
-                        `;
-                    } else {
-                        imagesHTML += `
-                            <div class="card-image ${photoIndex === 0 ? 'active' : ''}" data-photo="${photoIndex}">
-                                <img src="uploads/profiles/${photo}" alt="${user.first_name}" style="width: 100%; height: 100%; object-fit: cover;">
-                            </div>
-                        `;
-                    }
-                });
-                
-                // Navigation et indicateurs
-                let navigationHTML = '';
-                let indicatorsHTML = '';
-                if (user_photos.length > 1) {
-                    navigationHTML = `
-                        <div class="photo-navigation">
-                            <button class="nav-btn nav-prev" onclick="previousPhoto(this)">
-                                <i class="fas fa-chevron-left"></i>
-                            </button>
-                            <button class="nav-btn nav-next" onclick="nextPhoto(this)">
-                                <i class="fas fa-chevron-right"></i>
-                            </button>
-                        </div>
-                    `;
-                    
-                    indicatorsHTML = '<div class="photo-indicators">';
-                    for (let i = 0; i < user_photos.length; i++) {
-                        indicatorsHTML += `<div class="indicator ${i === 0 ? 'active' : ''}" data-photo="${i}" onclick="goToPhoto(this, ${i})"></div>`;
-                    }
-                    indicatorsHTML += '</div>';
-                }
-                
-                const premiumBadge = user.is_premium ? '<div class="premium-badge"><i class="fas fa-crown"></i></div>' : '';
-                const onlineStatus = '<div class="online-status offline"></div>';
-                const genderIcon = user.gender === 'male' ? '♂️' : (user.gender === 'female' ? '♀️' : '⚧️');
-                
-                const interests = user.interests ? user.interests.split(',').slice(0, 3).map(interest => 
-                    `<span class="interest-tag">${interest.trim()}</span>`
-                ).join('') : '';
-                
-                card.innerHTML = `
-                    <div class="card-image-gallery">
-                        ${imagesHTML}
-                        ${navigationHTML}
-                        ${indicatorsHTML}
-                        ${premiumBadge}
-                        ${onlineStatus}
-                    </div>
-                    <div class="card-info">
-                        <div>
-                            <div class="card-name">
-                                ${user.first_name} ${user.last_name ? user.last_name.charAt(0) + '.' : ''}, ${user.calculated_age || user.age || '25'}
-                                ${user.gender ? `<span class="gender-icon">${genderIcon}</span>` : ''}
-                            </div>
-                            <div class="card-details">
-                                ${user.location ? `<div class="detail-item"><i class="fas fa-map-marker-alt"></i> ${user.location}</div>` : ''}
-                                ${user.occupation ? `<div class="detail-item"><i class="fas fa-briefcase"></i> ${user.occupation}</div>` : ''}
-                                ${user.height ? `<div class="detail-item"><i class="fas fa-ruler-vertical"></i> ${user.height} cm</div>` : ''}
-                            </div>
-                        </div>
-                        ${user.bio ? `<div class="card-bio">"${user.bio.substring(0, 120)}${user.bio.length > 120 ? '...' : ''}"</div>` : ''}
-                        ${interests ? `<div class="card-interests">${interests}</div>` : ''}
-                    </div>
-                `;
-                
-                cardStack.appendChild(card);
             });
             
-            // Mettre à jour la liste des cartes
-            cards = document.querySelectorAll('.profile-card');
+            setTimeout(showNextCard, 600);
         }
-
-        function showMatchPopup() {
-            document.getElementById('matchPopup').style.display = 'flex';
-            // Animation d'entrée
-            const popup = document.querySelector('.match-content');
-            popup.style.transform = 'scale(0.5) rotate(-10deg)';
-            popup.style.opacity = '0';
+        
+        // Fonction pour gérer le dislike
+        function handleDislike() {
+            const currentCard = document.querySelector('.user-card.active');
+            if (!currentCard) return;            const userId = currentCard.getAttribute('data-user-id');
+            currentCard.classList.add('swiped-left');
             
-            setTimeout(() => {
-                popup.style.transition = 'all 0.6s cubic-bezier(0.175, 0.885, 0.32, 1.275)';
-                popup.style.transform = 'scale(1) rotate(0deg)';
-                popup.style.opacity = '1';
-            }, 50);
+            fetch('ajax/dislike_user.php', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/x-www-form-urlencoded',
+                },
+                body: 'user_id=' + userId
+            });
+            
+            setTimeout(showNextCard, 600);
         }
-
-        function closeMatchPopup() {
-            const popup = document.querySelector('.match-content');
-            popup.style.transition = 'all 0.4s ease-in';
-            popup.style.transform = 'scale(0.8)';
-            popup.style.opacity = '0';
-            
-            setTimeout(() => {
-                document.getElementById('matchPopup').style.display = 'none';
-            }, 400);
-        }
-
-        // Gestion du swipe tactile améliorée
-        let startX = 0, startY = 0;
-        let currentX = 0, currentY = 0;
-        let cardBeingDragged = null;
-        let isDragging = false;
-
-        document.addEventListener('touchstart', handleTouchStart, { passive: false });
-        document.addEventListener('touchmove', handleTouchMove, { passive: false });
-        document.addEventListener('touchend', handleTouchEnd, { passive: false });
-
-        function handleTouchStart(e) {
-            if (currentCardIndex >= cards.length || isLoading) return;
-            startX = e.touches[0].clientX;
-            startY = e.touches[0].clientY;
-            cardBeingDragged = cards[currentCardIndex];
-            isDragging = true;
-        }
-
-        function handleTouchMove(e) {
-            if (!cardBeingDragged || !isDragging) return;
-            e.preventDefault();
-            
-            currentX = e.touches[0].clientX;
-            currentY = e.touches[0].clientY;
-            const deltaX = currentX - startX;
-            const deltaY = currentY - startY;
-            const rotation = deltaX * 0.1;
-            const scale = 1 - Math.abs(deltaX) * 0.0005;
-            
-            cardBeingDragged.style.transform = `translateX(${deltaX}px) translateY(${deltaY * 0.5}px) rotate(${rotation}deg) scale(${scale})`;
-            cardBeingDragged.style.opacity = 1 - Math.abs(deltaX) * 0.002;
-        }
-
-        function handleTouchEnd(e) {
-            if (!cardBeingDragged || !isDragging) return;
-            
-            const deltaX = currentX - startX;
-            isDragging = false;
-            
-            if (Math.abs(deltaX) > 100) {
-                if (deltaX > 0) {
-                    performAction('like');
-                } else {
-                    performAction('pass');
-                }
-            } else {
-                // Animation de retour en place
-                cardBeingDragged.style.transition = 'all 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275)';
-                cardBeingDragged.style.transform = 'translateX(0) translateY(0) rotate(0deg) scale(1)';
-                cardBeingDragged.style.opacity = '1';
-                
-                setTimeout(() => {
-                    if (cardBeingDragged) {
-                        cardBeingDragged.style.transition = '';
-                    }
-                }, 400);
+        
+        // Fonction pour gérer le superlike
+        function handleSuperLike() {
+            const isPremium = <?php echo $isPremium ? 'true' : 'false' ?>;
+            if (!isPremium) {
+                showToast("Le Super Like est une fonctionnalité premium");
+                return;
             }
             
-            cardBeingDragged = null;
-        }
-
-        // Animation des boutons au hover
-        document.querySelectorAll('.action-btn').forEach(btn => {
-            btn.addEventListener('mouseenter', function() {
-                this.style.transform = 'scale(1.15)';
-                this.style.boxShadow = '0 12px 24px rgba(0,0,0,0.2)';
+            const currentCard = document.querySelector('.user-card.active');
+            if (!currentCard) return;            const userId = currentCard.getAttribute('data-user-id');
+            currentCard.classList.add('swiped-up');
+            
+            fetch('ajax/superlike_user.php', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/x-www-form-urlencoded',
+                },
+                body: 'user_id=' + userId
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.match) {
+                    showToast("Super Match! ⭐✨", true);
+                } else {
+                    showToast("Super Like envoyé! ⭐");
+                }
+            })
+            .catch(error => {
+                console.error('Erreur:', error);
             });
             
-            btn.addEventListener('mouseleave', function() {
-                this.style.transform = 'scale(1)';
-                this.style.boxShadow = '0 8px 16px rgba(0,0,0,0.1)';
+            setTimeout(showNextCard, 600);
+        }
+        
+        // Ajouter les événements aux boutons
+        document.querySelector('.action-button.like')?.addEventListener('click', handleLike);
+        document.querySelector('.action-button.dislike')?.addEventListener('click', handleDislike);
+        document.querySelector('.action-button.superlike')?.addEventListener('click', handleSuperLike);
+        
+        // Ajouter les raccourcis clavier
+        document.addEventListener('keydown', function(e) {
+            if (e.key === 'ArrowLeft') {
+                handleDislike();
+            } else if (e.key === 'ArrowRight') {
+                handleLike();
+            } else if (e.key === 'ArrowUp') {
+                handleSuperLike();
+            }
+        });
+        
+        // Gestion du drag & swipe
+        document.querySelectorAll('.user-card').forEach(card => {
+            card.addEventListener('touchstart', function(e) {
+                startX = e.touches[0].clientX;
+                startY = e.touches[0].clientY;
+            });
+            
+            card.addEventListener('touchmove', function(e) {
+                if (!card.classList.contains('active')) return;
+                
+                const currentX = e.touches[0].clientX;
+                const currentY = e.touches[0].clientY;
+                const diffX = currentX - startX;
+                const diffY = currentY - startY;
+                const rotation = diffX * 0.1; // Rotation proportionnelle au swipe
+                
+                // Appliquer la transformation
+                card.style.transform = `translateX(${diffX}px) translateY(${diffY}px) rotate(${rotation}deg)`;
+                
+                // Changer l'opacité en fonction de la direction
+                if (diffX > 50) {
+                    card.style.boxShadow = '0 10px 30px rgba(76, 175, 80, 0.3)';
+                } else if (diffX < -50) {
+                    card.style.boxShadow = '0 10px 30px rgba(255, 69, 88, 0.3)';
+                } else if (diffY < -50) {
+                    card.style.boxShadow = '0 10px 30px rgba(0, 209, 255, 0.3)';
+                }
+            });
+            
+            card.addEventListener('touchend', function(e) {
+                if (!card.classList.contains('active')) return;
+                
+                const currentX = e.changedTouches[0].clientX;
+                const currentY = e.changedTouches[0].clientY;
+                const diffX = currentX - startX;
+                const diffY = currentY - startY;
+                
+                // Réinitialiser la transformation
+                card.style.transform = '';
+                card.style.boxShadow = '';
+                
+                // Déterminer l'action en fonction du swipe
+                if (diffX > 100) {
+                    handleLike();
+                } else if (diffX < -100) {
+                    handleDislike();
+                } else if (diffY < -100) {
+                    handleSuperLike();
+                }
             });
         });
-
-        function nextPhoto(button) {
-            event.stopPropagation();
-            const card = button.closest('.profile-card');
-            const photos = card.querySelectorAll('.card-image');
-            const indicators = card.querySelectorAll('.indicator');
-            const currentPhoto = card.querySelector('.card-image.active');
-            const currentIndex = Array.from(photos).indexOf(currentPhoto);
-            const nextIndex = (currentIndex + 1) % photos.length;
-            
-            photos[currentIndex].classList.remove('active');
-            photos[nextIndex].classList.add('active');
-            indicators[currentIndex].classList.remove('active');
-            indicators[nextIndex].classList.add('active');
-        }
-
-        function previousPhoto(button) {
-            event.stopPropagation();
-            const card = button.closest('.profile-card');
-            const photos = card.querySelectorAll('.card-image');
-            const indicators = card.querySelectorAll('.indicator');
-            const currentPhoto = card.querySelector('.card-image.active');
-            const currentIndex = Array.from(photos).indexOf(currentPhoto);
-            const prevIndex = currentIndex === 0 ? photos.length - 1 : currentIndex - 1;
-            
-            photos[currentIndex].classList.remove('active');
-            photos[prevIndex].classList.add('active');
-            indicators[currentIndex].classList.remove('active');
-            indicators[prevIndex].classList.add('active');
-        }
-
-        function goToPhoto(indicator, photoIndex) {
-            event.stopPropagation();
-            const card = indicator.closest('.profile-card');
-            const photos = card.querySelectorAll('.card-image');
-            const indicators = card.querySelectorAll('.indicator');
-            const currentPhoto = card.querySelector('.card-image.active');
-            const currentIndex = Array.from(photos).indexOf(currentPhoto);
-            
-            if (currentIndex !== photoIndex) {
-                photos[currentIndex].classList.remove('active');
-                photos[photoIndex].classList.add('active');
-                indicators[currentIndex].classList.remove('active');
-                indicators[photoIndex].classList.add('active');
-            }
-        }
-
-        // Gestion du swipe tactile pour les photos
-        let photoStartX = 0;
-        let photoCurrentX = 0;
-        let isPhotoSwiping = false;
-        let cardBeingPhotoSwiped = null;
-
-        document.addEventListener('touchstart', function(e) {
-            const cardImageGallery = e.target.closest('.card-image-gallery');
-            if (cardImageGallery && !cardBeingDragged) { // Ne pas interférer avec le swipe de carte
-                photoStartX = e.touches[0].clientX;
-                isPhotoSwiping = true;
-                cardBeingPhotoSwiped = cardImageGallery.closest('.profile-card');
-            }
-        }, { passive: true });
-
-        document.addEventListener('touchmove', function(e) {
-            if (isPhotoSwiping && cardBeingPhotoSwiped) {
-                photoCurrentX = e.touches[0].clientX;
-                e.preventDefault(); // Empêcher le scroll pendant le swipe photo
-            }
-        }, { passive: false });
-
-        document.addEventListener('touchend', function(e) {
-            if (isPhotoSwiping && cardBeingPhotoSwiped) {
-                const deltaX = photoCurrentX - photoStartX;
-                const cardImageGallery = cardBeingPhotoSwiped.querySelector('.card-image-gallery');
-                
-                if (Math.abs(deltaX) > 50) { // Seuil pour déclencher le changement de photo
-                    if (deltaX > 0) {
-                        // Swipe vers la droite - photo précédente
-                        const prevBtn = cardImageGallery.querySelector('.nav-prev');
-                        if (prevBtn) previousPhoto(prevBtn);
-                    } else {
-                        // Swipe vers la gauche - photo suivante
-                        const nextBtn = cardImageGallery.querySelector('.nav-next');
-                        if (nextBtn) nextPhoto(nextBtn);
-                    }
-                }
-                
-                isPhotoSwiping = false;
-                cardBeingPhotoSwiped = null;
-            }
-        }, { passive: true });
-
-        // Modifier la fonction addNewProfiles pour inclure les photos multiples
-        function addNewProfiles(profiles) {
-            const cardStack = document.getElementById('cardStack');
-            
-            profiles.forEach((user, index) => {
-                const card = document.createElement('div');
-                card.className = 'profile-card';
-                card.setAttribute('data-user-id', user.id);
-                
-                // Gérer les photos multiples
-                let user_photos = [];
-                if (user.photos) {
-                    user_photos = user.photos.split(',');
-                } else if (user.profile_picture) {
-                    user_photos = [user.profile_picture];
-                } else {
-                    user_photos = ['default'];
-                }
-                
-                // Créer la galerie d'images
-                let imagesHTML = '';
-                user_photos.forEach((photo, photoIndex) => {
-                    if (photo === 'default') {
-                        imagesHTML += `
-                            <div class="card-image ${photoIndex === 0 ? 'active' : ''}" data-photo="${photoIndex}">
-                                <div class="avatar-placeholder">${user.first_name.charAt(0).toUpperCase()}</div>
-                            </div>
-                        `;
-                    } else {
-                        imagesHTML += `
-                            <div class="card-image ${photoIndex === 0 ? 'active' : ''}" data-photo="${photoIndex}">
-                                <img src="uploads/profiles/${photo}" alt="${user.first_name}" style="width: 100%; height: 100%; object-fit: cover;">
-                            </div>
-                        `;
-                    }
-                });
-                
-                // Navigation et indicateurs
-                let navigationHTML = '';
-                let indicatorsHTML = '';
-                if (user_photos.length > 1) {
-                    navigationHTML = `
-                        <div class="photo-navigation">
-                            <button class="nav-btn nav-prev" onclick="previousPhoto(this)">
-                                <i class="fas fa-chevron-left"></i>
-                            </button>
-                            <button class="nav-btn nav-next" onclick="nextPhoto(this)">
-                                <i class="fas fa-chevron-right"></i>
-                            </button>
-                        </div>
-                    `;
-                    
-                    indicatorsHTML = '<div class="photo-indicators">';
-                    for (let i = 0; i < user_photos.length; i++) {
-                        indicatorsHTML += `<div class="indicator ${i === 0 ? 'active' : ''}" data-photo="${i}" onclick="goToPhoto(this, ${i})"></div>`;
-                    }
-                    indicatorsHTML += '</div>';
-                }
-                
-                const premiumBadge = user.is_premium ? '<div class="premium-badge"><i class="fas fa-crown"></i></div>' : '';
-                const onlineStatus = '<div class="online-status offline"></div>';
-                const genderIcon = user.gender === 'male' ? '♂️' : (user.gender === 'female' ? '♀️' : '⚧️');
-                
-                const interests = user.interests ? user.interests.split(',').slice(0, 3).map(interest => 
-                    `<span class="interest-tag">${interest.trim()}</span>`
-                ).join('') : '';
-                
-                card.innerHTML = `
-                    <div class="card-image-gallery">
-                        ${imagesHTML}
-                        ${navigationHTML}
-                        ${indicatorsHTML}
-                        ${premiumBadge}
-                        ${onlineStatus}
-                    </div>
-                    <div class="card-info">
-                        <div>
-                            <div class="card-name">
-                                ${user.first_name} ${user.last_name ? user.last_name.charAt(0) + '.' : ''}, ${user.calculated_age || user.age || '25'}
-                                ${user.gender ? `<span class="gender-icon">${genderIcon}</span>` : ''}
-                            </div>
-                            <div class="card-details">
-                                ${user.location ? `<div class="detail-item"><i class="fas fa-map-marker-alt"></i> ${user.location}</div>` : ''}
-                                ${user.occupation ? `<div class="detail-item"><i class="fas fa-briefcase"></i> ${user.occupation}</div>` : ''}
-                                ${user.height ? `<div class="detail-item"><i class="fas fa-ruler-vertical"></i> ${user.height} cm</div>` : ''}
-                            </div>
-                        </div>
-                        ${user.bio ? `<div class="card-bio">"${user.bio.substring(0, 120)}${user.bio.length > 120 ? '...' : ''}"</div>` : ''}
-                        ${interests ? `<div class="card-interests">${interests}</div>` : ''}
-                    </div>
-                `;
-                
-                cardStack.appendChild(card);
-            });
-            
-            // Mettre à jour la liste des cartes
-            cards = document.querySelectorAll('.profile-card');
-        }
+    });
     </script>
 </body>
 </html>
+<?php
+// S'assurer qu'aucun contenu supplémentaire ne sera affiché
+ob_end_flush();
+?>
+

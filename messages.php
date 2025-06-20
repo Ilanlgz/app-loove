@@ -1,751 +1,871 @@
 <?php
 session_start();
 
-if(!isset($_SESSION["loggedin"]) || $_SESSION["loggedin"] !== true){
+if (!isset($_SESSION["loggedin"]) || $_SESSION["loggedin"] !== true) {
     header("location: login.php");
     exit;
 }
 
-// Créer les tables de messages si elles n'existent pas
 require_once 'config/database.php';
+
+// Vérifier d'abord si user_id existe dans la session
+if (!isset($_SESSION['user_id'])) {
+    header("location: login.php");
+    exit;
+}
+
+$user_id = $_SESSION['user_id'];
+
+// Vérifier la structure de la table messages
+$conn = getDbConnection();
 try {
-    $conn = getDbConnection();
-    
-    // Table des conversations
-    $conversationsQuery = "CREATE TABLE IF NOT EXISTS conversations (
-        id INT AUTO_INCREMENT PRIMARY KEY,
-        user1_id INT NOT NULL,
-        user2_id INT NOT NULL,
-        last_message TEXT,
-        last_message_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-        INDEX idx_user1 (user1_id),
-        INDEX idx_user2 (user2_id),
-        UNIQUE KEY unique_conversation (user1_id, user2_id)
-    )";
-    
-    // Table des messages
-    $messagesQuery = "CREATE TABLE IF NOT EXISTS messages (
-        id INT AUTO_INCREMENT PRIMARY KEY,
-        conversation_id INT NOT NULL,
-        from_user_id INT NOT NULL,
-        to_user_id INT NOT NULL,
-        message_text TEXT NOT NULL,
-        sent_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-        is_read BOOLEAN DEFAULT FALSE,
-        INDEX idx_conversation (conversation_id),
-        INDEX idx_from_user (from_user_id),
-        INDEX idx_to_user (to_user_id)
-    )";
-    
-    $conn->exec($conversationsQuery);
-    $conn->exec($messagesQuery);
-    
+    $stmt = $conn->query("DESCRIBE messages");
+    $columns = $stmt->fetchAll(PDO::FETCH_COLUMN);
 } catch (PDOException $e) {
-    // Ignorer les erreurs de création de tables
+    // Si la table n'existe pas, la créer
+    $conn->exec("
+        CREATE TABLE IF NOT EXISTS messages (
+            id INT AUTO_INCREMENT PRIMARY KEY,
+            sender_id INT NOT NULL,
+            receiver_id INT NOT NULL,
+            content TEXT NOT NULL,
+            is_read BOOLEAN DEFAULT FALSE,
+            sent_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            FOREIGN KEY (sender_id) REFERENCES users(id),
+            FOREIGN KEY (receiver_id) REFERENCES users(id)
+        )
+    ");
+    $columns = ['id', 'sender_id', 'receiver_id', 'content', 'is_read', 'sent_at'];
 }
 
-require_once 'classes/Message.php';
+// Déterminer le nom de la colonne timestamp
+$timestamp_column = in_array('created_at', $columns) ? 'created_at' : 'sent_at';
 
-$messageSystem = new Message();
-$conversations = $messageSystem->getUserConversations($_SESSION["user_id"]);
+// Récupérer les conversations de l'utilisateur
+$stmt = $conn->prepare("
+    SELECT DISTINCT
+        u.id as user_id,
+        u.first_name,
+        u.last_name,
+        u.profile_picture,
+        COALESCE(u.last_active, u.created_at) as last_active,
+        (SELECT content FROM messages 
+         WHERE (sender_id = ? AND receiver_id = u.id) 
+            OR (sender_id = u.id AND receiver_id = ?)
+         ORDER BY $timestamp_column DESC LIMIT 1) as last_message,
+        (SELECT $timestamp_column FROM messages 
+         WHERE (sender_id = ? AND receiver_id = u.id) 
+            OR (sender_id = u.id AND receiver_id = ?)
+         ORDER BY $timestamp_column DESC LIMIT 1) as last_message_time,
+        (SELECT COUNT(*) FROM messages 
+         WHERE sender_id = u.id AND receiver_id = ? AND is_read = 0) as unread_count
+    FROM users u
+    WHERE u.id IN (
+        SELECT DISTINCT 
+            CASE 
+                WHEN sender_id = ? THEN receiver_id 
+                ELSE sender_id 
+            END 
+        FROM messages 
+        WHERE sender_id = ? OR receiver_id = ?
+    )
+    ORDER BY last_message_time DESC
+");
 
-// Si un chat spécifique est demandé
-$active_chat = isset($_GET['chat']) ? (int)$_GET['chat'] : null;
-$active_messages = [];
-$active_user = null;
+$stmt->execute([$user_id, $user_id, $user_id, $user_id, $user_id, $user_id, $user_id, $user_id]);
+$conversations = $stmt->fetchAll(PDO::FETCH_ASSOC);
 
-if ($active_chat) {
-    $active_messages = $messageSystem->getConversationMessages($_SESSION["user_id"], $active_chat);
-    
-    // Récupérer les infos de l'utilisateur
-    $conn = getDbConnection();
-    $query = "SELECT first_name, last_name, profile_picture FROM users WHERE id = :user_id";
-    $stmt = $conn->prepare($query);
-    $stmt->bindParam(':user_id', $active_chat, PDO::PARAM_INT);
-    $stmt->execute();
-    $active_user = $stmt->fetch(PDO::FETCH_ASSOC);
-}
+// Récupérer des utilisateurs suggérés pour commencer une conversation
+$stmt = $conn->prepare("
+    SELECT id, first_name, last_name, profile_picture 
+    FROM users 
+    WHERE id != ? 
+    AND id NOT IN (
+        SELECT DISTINCT 
+            CASE 
+                WHEN sender_id = ? THEN receiver_id 
+                ELSE sender_id 
+            END 
+        FROM messages 
+        WHERE sender_id = ? OR receiver_id = ?
+    )
+    LIMIT 5
+");
+$stmt->execute([$user_id, $user_id, $user_id, $user_id]);
+$suggested_users = $stmt->fetchAll(PDO::FETCH_ASSOC);
 ?>
-
 <!DOCTYPE html>
 <html lang="fr">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Messages - Loove</title>
-    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">    <title>Messages - Loove</title>
+    <link rel="stylesheet" href="assets/css/footer.css">
     <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;600;700&display=swap" rel="stylesheet">
-    <style>
-        :root {
-            --primary-color: #FF4458;
-            --secondary-color: #FD5068;
-            --text-primary: #2c2c2c;
-            --text-secondary: #8E8E93;
-            --background: #FAFAFA;
-            --white: #FFFFFF;
-            --success: #34C759;
-        }
-
-        * { margin: 0; padding: 0; box-sizing: border-box; }
-
-        body {
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="assets/css/hearts-background.css">
+    <style>        /* Modification du background body pour s'intégrer avec les coeurs */
+        body, html {
+            margin: 0;
+            padding: 0;
             font-family: 'Poppins', sans-serif;
-            background: var(--background);
-            color: var(--text-primary);
-            height: 100vh;
-            overflow: hidden;
+            min-height: 100vh;
+            background: linear-gradient(135deg, #FF4458 0%, #FF6B81 25%, #FD5068 50%, #FF8A95 75%, #FFB3C1 100%);
+            position: relative;
+            overflow-x: hidden;
         }
 
+        body::before {
+            content: '';
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: 
+                radial-gradient(circle at 20% 80%, rgba(255, 68, 88, 0.3) 0%, transparent 50%),
+                radial-gradient(circle at 80% 20%, rgba(255, 107, 129, 0.3) 0%, transparent 50%),
+                radial-gradient(circle at 40% 40%, rgba(253, 80, 104, 0.2) 0%, transparent 50%);
+            z-index: -1;
+            animation: floatingColors 20s ease-in-out infinite;
+        }
+
+        @keyframes floatingColors {
+            0%, 100% { 
+                background: 
+                    radial-gradient(circle at 20% 80%, rgba(255, 68, 88, 0.3) 0%, transparent 50%),
+                    radial-gradient(circle at 80% 20%, rgba(255, 107, 129, 0.3) 0%, transparent 50%),
+                    radial-gradient(circle at 40% 40%, rgba(253, 80, 104, 0.2) 0%, transparent 50%);
+            }
+            50% { 
+                background: 
+                    radial-gradient(circle at 70% 30%, rgba(255, 68, 88, 0.3) 0%, transparent 50%),
+                    radial-gradient(circle at 30% 70%, rgba(255, 107, 129, 0.3) 0%, transparent 50%),
+                    radial-gradient(circle at 60% 60%, rgba(253, 80, 104, 0.2) 0%, transparent 50%);
+            }
+        }        /* Header unifié avec taille cohérente */
         .header {
-            background: var(--white);
-            padding: 20px;
-            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
-            position: relative;
-            z-index: 100;
+            background: linear-gradient(135deg, #FF4458, #FF6B81);
+            backdrop-filter: blur(20px);
+            border-bottom: 1px solid rgba(255, 255, 255, 0.2);
+            padding: 12px 0;
+            position: sticky;
+            top: 0;
+            z-index: 1000;
+            box-shadow: 0 2px 20px rgba(0, 0, 0, 0.1);
         }
 
         .nav-container {
-            max-width: 1200px;
+            max-width: 1400px;
             margin: 0 auto;
+            padding: 0 24px;
             display: flex;
             justify-content: space-between;
             align-items: center;
         }
 
         .logo {
-            font-size: 1.8rem;
+            font-size: 22px;
             font-weight: 700;
-            color: var(--primary-color);
+            color: white;
+            letter-spacing: 0.5px;
+            display: flex;
+            align-items: center;
             text-decoration: none;
+            transition: opacity 0.3s ease;
+        }
+
+        .logo:hover {
+            opacity: 0.8;
+        }
+
+        .logo i {
+            margin-right: 6px;
+            font-size: 20px;
         }
 
         .nav-menu {
             display: flex;
-            gap: 30px;
             align-items: center;
+            gap: 8px;
         }
 
         .nav-link {
-            color: var(--text-primary);
-            text-decoration: none;
-            font-weight: 500;
-            padding: 10px 15px;
-            border-radius: 8px;
-            transition: all 0.3s ease;
-        }
-
-        .nav-link:hover, .nav-link.active {
-            color: var(--primary-color);
-            background: rgba(255, 68, 88, 0.1);
-        }
-
-        .btn-logout {
-            background: linear-gradient(135deg, var(--primary-color), var(--secondary-color));
-            color: var(--white);
-            padding: 10px 20px;
-            border: none;
-            border-radius: 8px;
-            text-decoration: none;
-            font-weight: 600;
-        }
-
-        .messages-container {
             display: flex;
-            height: calc(100vh - 100px);
-            max-width: 1200px;
-            margin: 0 auto;
-        }
-
-        .conversations-panel {
-            width: 350px;
-            background: var(--white);
-            border-right: 1px solid #E8E8E8;
-            display: flex;
-            flex-direction: column;
-        }
-
-        .panel-header {
-            padding: 25px 20px;
-            border-bottom: 1px solid #E8E8E8;
-            display: flex;
-            justify-content: space-between;
             align-items: center;
-        }
-
-        .panel-title {
-            font-size: 1.5rem;
-            font-weight: 600;
-        }
-
-        .search-btn {
-            background: linear-gradient(135deg, var(--primary-color), var(--secondary-color));
-            color: var(--white);
-            border: none;
-            padding: 10px 15px;
+            gap: 6px;
+            padding: 8px 16px;
+            color: rgba(255, 255, 255, 0.9);
+            text-decoration: none;
             border-radius: 8px;
-            cursor: pointer;
+            font-weight: 500;
             transition: all 0.3s ease;
+            position: relative;
+            font-size: 14px;
         }
 
-        .search-btn:hover {
+        .nav-link:hover {
+            background: rgba(255, 255, 255, 0.15);
+            color: white;
             transform: translateY(-2px);
         }
 
+        .nav-link.active {
+            background: rgba(255, 255, 255, 0.25);
+            color: white;
+            box-shadow: 0 4px 12px rgba(255, 255, 255, 0.2);
+        }
+
+        .nav-link i {
+            font-size: 16px;
+            width: 16px;
+            text-align: center;
+        }
+
+        .user-info {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            margin-left: 20px;
+            padding-left: 20px;
+            border-left: 1px solid rgba(255, 255, 255, 0.3);
+        }
+
+        .user-avatar {
+            width: 32px;
+            height: 32px;
+            background: white;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: #FF4458;
+            font-weight: 600;
+            font-size: 14px;
+        }
+
+        .user-info span {
+            font-weight: 500;
+            color: white;
+        }
+
+        .btn-logout {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            padding: 6px 12px;
+            background: rgba(255, 255, 255, 0.15);
+            color: white;
+            text-decoration: none;
+            border-radius: 6px;
+            font-weight: 500;
+            transition: all 0.3s ease;
+            font-size: 13px;
+        }
+
+        .btn-logout:hover {
+            background: white;
+            color: #FF4458;
+            transform: translateY(-2px);
+            box-shadow: 0 4px 12px rgba(255, 255, 255, 0.3);
+        }
+
+        /* Container principal */
+        .messages-container {
+            max-width: 1200px;
+            margin: 40px auto;
+            padding: 20px;
+            display: grid;
+            grid-template-columns: 1fr 300px;
+            gap: 24px;
+        }
+
+        /* Section conversations */
+        .conversations-section {
+            background: rgba(255, 255, 255, 0.95);
+            backdrop-filter: blur(20px);
+            border-radius: 20px;
+            padding: 24px;
+            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.1);
+        }
+
+        .section-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 24px;
+            padding-bottom: 16px;
+            border-bottom: 1px solid #f1f3f4;
+        }
+
+        .section-title {
+            font-size: 24px;
+            font-weight: 700;
+            color: #333;
+            margin: 0;
+        }
+
+        .new-message-btn {
+            background: linear-gradient(135deg, #FF4458, #FF6B81);
+            color: white;
+            border: none;
+            border-radius: 12px;
+            padding: 8px 16px;
+            font-size: 14px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            display: flex;
+            align-items: center;
+            gap: 6px;
+        }
+
+        .new-message-btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 4px 12px rgba(255, 68, 88, 0.3);
+        }
+
+        /* Barre de recherche */
+        .search-container {
+            position: relative;
+            margin-bottom: 20px;
+        }
+
+        .search-input {
+            width: 100%;
+            padding: 12px 16px 12px 44px;
+            background: rgba(255, 255, 255, 0.8);
+            border: 2px solid rgba(255, 68, 88, 0.2);
+            border-radius: 12px;
+            font-size: 14px;
+            outline: none;
+            transition: all 0.3s ease;
+            box-sizing: border-box;
+        }
+
+        .search-input:focus {
+            border-color: #FF4458;
+            box-shadow: 0 0 0 3px rgba(255, 68, 88, 0.1);
+        }
+
+        .search-icon {
+            position: absolute;
+            left: 14px;
+            top: 50%;
+            transform: translateY(-50%);
+            color: #9ca3af;
+        }
+
+        /* Liste des conversations */
         .conversations-list {
-            flex: 1;
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+            max-height: 500px;
             overflow-y: auto;
         }
 
         .conversation-item {
-            padding: 20px;
-            border-bottom: 1px solid #F0F0F0;
-            cursor: pointer;
-            transition: all 0.3s ease;
+            background: rgba(255, 255, 255, 0.8);
+            border: 1px solid rgba(255, 255, 255, 0.3);
+            border-radius: 12px;
+            padding: 12px;
             display: flex;
             align-items: center;
-            gap: 15px;
+            gap: 12px;
+            text-decoration: none;
+            color: inherit;
+            transition: all 0.3s ease;
+            cursor: pointer;
         }
 
-        .conversation-item:hover, .conversation-item.active {
-            background: rgba(255, 68, 88, 0.05);
+        .conversation-item:hover {
+            background: rgba(255, 255, 255, 0.95);
+            border-color: rgba(255, 68, 88, 0.3);
+            transform: translateY(-1px);
+            box-shadow: 0 4px 12px rgba(255, 68, 88, 0.1);
         }
 
         .conversation-avatar {
-            width: 50px;
-            height: 50px;
-            border-radius: 50%;
-            background: linear-gradient(135deg, var(--primary-color), var(--secondary-color));
+            width: 48px;
+            height: 48px;
+            border-radius: 12px;
+            background: linear-gradient(135deg, #FF4458, #FF6B81);
             display: flex;
             align-items: center;
             justify-content: center;
-            color: var(--white);
+            color: white;
             font-weight: 600;
-            font-size: 1.2rem;
+            font-size: 18px;
+            position: relative;
+            flex-shrink: 0;
         }
 
         .conversation-avatar img {
             width: 100%;
             height: 100%;
+            border-radius: 12px;
             object-fit: cover;
+        }
+
+        .online-indicator {
+            position: absolute;
+            bottom: -2px;
+            right: -2px;
+            width: 12px;
+            height: 12px;
+            background: #22c55e;
+            border: 2px solid white;
             border-radius: 50%;
         }
 
-        .conversation-info {
+        .conversation-content {
             flex: 1;
+            min-width: 0;
+        }
+
+        .conversation-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 2px;
         }
 
         .conversation-name {
+            font-size: 14px;
             font-weight: 600;
-            margin-bottom: 5px;
+            color: #333;
+            margin: 0;
+        }
+
+        .conversation-time {
+            font-size: 11px;
+            color: #999;
         }
 
         .conversation-preview {
-            color: var(--text-secondary);
-            font-size: 0.9rem;
+            color: #666;
+            font-size: 12px;
+            margin: 0;
             white-space: nowrap;
             overflow: hidden;
             text-overflow: ellipsis;
         }
 
-        .chat-panel {
-            flex: 1;
+        .unread-badge {
+            background: linear-gradient(135deg, #FF4458, #FF6B81);
+            color: white;
+            border-radius: 8px;
+            padding: 2px 6px;
+            font-size: 10px;
+            font-weight: 600;
+            min-width: 16px;
+            text-align: center;
+            margin-left: 8px;
+        }
+
+        /* Section suggestions */
+        .suggestions-section {
+            background: rgba(255, 255, 255, 0.95);
+            backdrop-filter: blur(20px);
+            border-radius: 20px;
+            padding: 24px;
+            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.1);
+        }
+
+        .suggestions-list {
             display: flex;
             flex-direction: column;
-            background: var(--white);
+            gap: 12px;
         }
 
-        .chat-header {
-            padding: 20px 25px;
-            border-bottom: 1px solid #E8E8E8;
+        .suggestion-item {
             display: flex;
             align-items: center;
-            gap: 15px;
-            background: var(--white);
+            gap: 12px;
+            padding: 12px;
+            background: rgba(255, 255, 255, 0.8);
+            border-radius: 12px;
+            border: 1px solid rgba(255, 255, 255, 0.3);
+            transition: all 0.3s ease;
         }
 
-        .chat-avatar {
-            width: 45px;
-            height: 45px;
-            border-radius: 50%;
-            background: linear-gradient(135deg, var(--primary-color), var(--secondary-color));
+        .suggestion-item:hover {
+            background: rgba(255, 255, 255, 0.95);
+            border-color: rgba(255, 68, 88, 0.3);
+            transform: translateY(-1px);
+        }
+
+        .suggestion-avatar {
+            width: 40px;
+            height: 40px;
+            border-radius: 10px;
+            background: linear-gradient(135deg, #FF4458, #FF6B81);
             display: flex;
             align-items: center;
             justify-content: center;
-            color: var(--white);
+            color: white;
             font-weight: 600;
+            font-size: 16px;
+            flex-shrink: 0;
         }
 
-        .chat-avatar img {
+        .suggestion-avatar img {
             width: 100%;
             height: 100%;
+            border-radius: 10px;
             object-fit: cover;
-            border-radius: 50%;
         }
 
-        .chat-info h3 {
+        .suggestion-info {
+            flex: 1;
+        }
+
+        .suggestion-name {
+            font-size: 14px;
             font-weight: 600;
-            margin-bottom: 3px;
+            color: #333;
+            margin: 0 0 2px 0;
         }
 
-        .chat-status {
-            color: var(--text-secondary);
-            font-size: 0.9rem;
+        .suggestion-status {
+            font-size: 12px;
+            color: #666;
+            margin: 0;
         }
 
-        .messages-area {
-            flex: 1;
-            padding: 20px;
-            overflow-y: auto;
-            background: #F8F8F8;
-        }
-
-        .message {
-            display: flex;
-            margin-bottom: 20px;
-            animation: fadeInUp 0.3s ease;
-        }
-
-        .message.sent {
-            justify-content: flex-end;
-        }
-
-        .message-content {
-            max-width: 70%;
-            padding: 15px 20px;
-            border-radius: 20px;
-            position: relative;
-        }
-
-        .message.received .message-content {
-            background: var(--white);
-            border-bottom-left-radius: 5px;
-        }
-
-        .message.sent .message-content {
-            background: linear-gradient(135deg, var(--primary-color), var(--secondary-color));
-            color: var(--white);
-            border-bottom-right-radius: 5px;
-        }
-
-        .message-time {
-            font-size: 0.75rem;
-            opacity: 0.7;
-            margin-top: 5px;
-        }
-
-        .message-input-area {
-            padding: 20px 25px;
-            background: var(--white);
-            border-top: 1px solid #E8E8E8;
-            display: flex;
-            gap: 15px;
-            align-items: center;
-        }
-
-        .message-input {
-            flex: 1;
-            padding: 15px 20px;
-            border: 2px solid #E8E8E8;
-            border-radius: 25px;
-            font-size: 1rem;
-            font-family: inherit;
-            outline: none;
-            transition: all 0.3s ease;
-        }
-
-        .message-input:focus {
-            border-color: var(--primary-color);
-        }
-
-        .send-btn {
-            background: linear-gradient(135deg, var(--primary-color), var(--secondary-color));
-            color: var(--white);
+        .start-chat-btn {
+            background: linear-gradient(135deg, #FF4458, #FF6B81);
+            color: white;
             border: none;
-            width: 50px;
-            height: 50px;
-            border-radius: 50%;
+            border-radius: 8px;
+            padding: 6px 12px;
+            font-size: 12px;
+            font-weight: 600;
             cursor: pointer;
             transition: all 0.3s ease;
-            display: flex;
-            align-items: center;
-            justify-content: center;
         }
 
-        .send-btn:hover {
-            transform: scale(1.1);
+        .start-chat-btn:hover {
+            transform: scale(1.05);
+            box-shadow: 0 2px 8px rgba(255, 68, 88, 0.3);
         }
 
+        /* État vide */
         .empty-state {
-            display: flex;
-            flex-direction: column;
-            justify-content: center;
-            align-items: center;
-            height: 100%;
-            color: var(--text-secondary);
             text-align: center;
+            padding: 40px 20px;
+            color: #666;
         }
 
         .empty-state i {
-            font-size: 4rem;
-            margin-bottom: 20px;
-            color: var(--primary-color);
-            opacity: 0.5;
+            font-size: 48px;
+            color: #FF4458;
+            margin-bottom: 16px;
         }
 
-        @keyframes fadeInUp {
-            from {
-                opacity: 0;
-                transform: translateY(20px);
-            }
-            to {
-                opacity: 1;
-                transform: translateY(0);
-            }
+        .empty-state h3 {
+            font-size: 18px;
+            margin: 0 0 8px 0;
+            color: #333;
         }
 
-        /* Modal de recherche */
-        .search-modal {
+        .empty-state p {
+            margin: 0 0 20px 0;
+            font-size: 14px;
+        }
+
+        .discover-btn {
+            background: linear-gradient(135deg, #FF4458, #FF6B81);
+            color: white;
+            padding: 10px 20px;
+            border-radius: 10px;
+            text-decoration: none;
+            font-weight: 600;
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            transition: all 0.3s ease;
+        }
+
+        .discover-btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 4px 12px rgba(255, 68, 88, 0.3);
+        }
+
+        /* Modal nouvelle conversation */
+        .modal {
+            display: none;
             position: fixed;
             top: 0;
             left: 0;
             width: 100%;
             height: 100%;
-            background: rgba(0,0,0,0.8);
-            display: none;
-            justify-content: center;
-            align-items: center;
-            z-index: 1000;
+            background: rgba(0, 0, 0, 0.5);
+            z-index: 2000;
         }
 
-        .search-content {
-            background: var(--white);
-            padding: 30px;
+        .modal-content {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            background: white;
             border-radius: 20px;
+            padding: 24px;
             width: 90%;
-            max-width: 500px;
+            max-width: 400px;
+            box-shadow: 0 20px 40px rgba(0, 0, 0, 0.3);
         }
 
-        .search-input {
-            width: 100%;
-            padding: 15px 20px;
-            border: 2px solid #E8E8E8;
-            border-radius: 12px;
-            font-size: 1rem;
+        .modal-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
             margin-bottom: 20px;
         }
 
-        .search-results {
-            max-height: 300px;
-            overflow-y: auto;
+        .modal-title {
+            font-size: 20px;
+            font-weight: 700;
+            color: #333;
+            margin: 0;
         }
 
-        .search-result-item {
-            padding: 15px;
-            border-radius: 12px;
+        .close-btn {
+            background: none;
+            border: none;
+            font-size: 24px;
+            color: #999;
             cursor: pointer;
-            transition: all 0.3s ease;
+            padding: 0;
+            width: 30px;
+            height: 30px;
             display: flex;
             align-items: center;
-            gap: 15px;
-            margin-bottom: 10px;
+            justify-content: center;
         }
 
-        .search-result-item:hover {
-            background: rgba(255, 68, 88, 0.1);
-        }
-
+        /* Responsive */
         @media (max-width: 768px) {
             .messages-container {
-                flex-direction: column;
+                grid-template-columns: 1fr;
+                margin: 20px 16px;
+                padding: 16px;
+                gap: 16px;
             }
             
-            .conversations-panel {
-                width: 100%;
-                height: 40%;
+            .nav-container {
+                padding: 0 16px;
             }
             
-            .chat-panel {
-                height: 60%;
+            .user-info span {
+                display: none;
             }
         }
     </style>
 </head>
 <body>
-    <header class="header">
-        <div class="nav-container">
-            <a href="main.php" class="logo">
-                <i class="fas fa-heart"></i> Loove
-            </a>
-            <nav class="nav-menu">
-                <a href="discover.php" class="nav-link">
-                    <i class="fas fa-search"></i> Découvrir
-                </a>
-                <a href="matches.php" class="nav-link">
-                    <i class="fas fa-heart"></i> Matches
-                </a>
-                <a href="messages.php" class="nav-link active">
-                    <i class="fas fa-comments"></i> Messages
-                </a>
-                <a href="profile.php" class="nav-link">
-                    <i class="fas fa-user"></i> Profil
-                </a>
-                <a href="logout.php" class="btn-logout">
-                    <i class="fas fa-sign-out-alt"></i> Déconnexion
-                </a>
-            </nav>
-        </div>
-    </header>
+    <!-- Container des coeurs flottants -->
+    <div class="hearts-container">
+        <i class="fas fa-heart heart"></i>
+        <i class="fas fa-heart heart"></i>
+        <i class="fas fa-heart heart"></i>
+        <i class="fas fa-heart heart"></i>
+        <i class="fas fa-heart heart"></i>
+        <i class="fas fa-heart heart"></i>
+        <i class="fas fa-heart heart"></i>
+        <i class="fas fa-heart heart"></i>
+        <i class="fas fa-heart heart"></i>
+        <i class="fas fa-heart heart"></i>
+    </div>
+
+       <?php include 'includes/navbar.php'; ?>
 
     <div class="messages-container">
-        <!-- Panel des conversations -->
-        <div class="conversations-panel">
-            <div class="panel-header">
-                <h2 class="panel-title">Messages</h2>
-                <button class="search-btn" onclick="openSearchModal()">
-                    <i class="fas fa-search"></i>
+        <!-- Section des conversations -->
+        <div class="conversations-section">
+            <div class="section-header">
+                <h2 class="section-title">Messages</h2>
+                <button class="new-message-btn" onclick="openNewMessageModal()">
+                    <i class="fas fa-plus"></i>
+                    Nouveau
                 </button>
             </div>
-            
-            <div class="conversations-list">
-                <?php if (empty($conversations)): ?>
-                    <div style="padding: 40px 20px; text-align: center; color: var(--text-secondary);">
-                        <i class="fas fa-comment-dots" style="font-size: 2rem; margin-bottom: 15px; opacity: 0.5;"></i>
-                        <p>Aucune conversation</p>
-                        <p style="font-size: 0.9rem; margin-top: 5px;">Commencez à discuter avec vos matches !</p>
-                    </div>
-                <?php else: ?>
-                    <?php foreach ($conversations as $conversation): ?>
-                        <div class="conversation-item <?php echo $active_chat == $conversation['other_user_id'] ? 'active' : ''; ?>" 
-                             onclick="openChat(<?php echo $conversation['other_user_id']; ?>)">
-                            <div class="conversation-avatar">
-                                <?php if ($conversation['other_user_picture']): ?>
-                                    <img src="uploads/profiles/<?php echo htmlspecialchars($conversation['other_user_picture']); ?>" alt="">
-                                <?php else: ?>
-                                    <?php echo strtoupper(substr($conversation['other_user_name'], 0, 1)); ?>
-                                <?php endif; ?>
-                            </div>
-                            <div class="conversation-info">
-                                <div class="conversation-name"><?php echo htmlspecialchars($conversation['other_user_name']); ?></div>
-                                <div class="conversation-preview">
-                                    <?php echo $conversation['last_message'] ? htmlspecialchars(substr($conversation['last_message'], 0, 40)) . '...' : 'Nouvelle conversation'; ?>
-                                </div>
-                            </div>
-                        </div>
-                    <?php endforeach; ?>
-                <?php endif; ?>
+
+            <div class="search-container">
+                <input type="text" class="search-input" placeholder="Rechercher une conversation..." id="searchInput">
+                <i class="fas fa-search search-icon"></i>
             </div>
-        </div>
 
-        <!-- Panel de chat -->
-        <div class="chat-panel">
-            <?php if ($active_chat && $active_user): ?>
-                <div class="chat-header">
-                    <div class="chat-avatar">
-                        <?php if ($active_user['profile_picture']): ?>
-                            <img src="uploads/profiles/<?php echo htmlspecialchars($active_user['profile_picture']); ?>" alt="">
-                        <?php else: ?>
-                            <?php echo strtoupper(substr($active_user['first_name'], 0, 1)); ?>
-                        <?php endif; ?>
-                    </div>
-                    <div class="chat-info">
-                        <h3><?php echo htmlspecialchars($active_user['first_name'] . ' ' . substr($active_user['last_name'], 0, 1) . '.'); ?></h3>
-                        <div class="chat-status">En ligne</div>
-                    </div>
-                </div>
-
-                <div class="messages-area" id="messagesArea">
-                    <?php foreach ($active_messages as $message): ?>
-                        <div class="message <?php echo $message['from_user_id'] == $_SESSION['user_id'] ? 'sent' : 'received'; ?>">
-                            <div class="message-content">
-                                <?php echo htmlspecialchars($message['message_text']); ?>
-                                <div class="message-time">
-                                    <?php echo date('H:i', strtotime($message['sent_at'])); ?>
-                                </div>
-                            </div>
-                        </div>
-                    <?php endforeach; ?>
-                </div>
-
-                <div class="message-input-area">
-                    <input type="text" class="message-input" id="messageInput" placeholder="Tapez votre message..." onkeypress="handleKeyPress(event)">
-                    <button class="send-btn" onclick="sendMessage()">
-                        <i class="fas fa-paper-plane"></i>
-                    </button>
-                </div>
-            <?php else: ?>
+            <?php if (empty($conversations)): ?>
                 <div class="empty-state">
                     <i class="fas fa-comments"></i>
-                    <h3>Sélectionnez une conversation</h3>
-                    <p>Choisissez une conversation pour commencer à discuter</p>
+                    <h3>Aucune conversation</h3>
+                    <p>Commencez à découvrir de nouveaux profils pour débuter des conversations !</p>
+                    <a href="discover.php" class="discover-btn">
+                        <i class="fas fa-heart"></i>
+                        Découvrir des profils
+                    </a>
+                </div>
+            <?php else: ?>
+                <div class="conversations-list">
+                    <?php foreach ($conversations as $conversation): ?>
+                        <a href="chat.php?user_id=<?php echo $conversation['user_id']; ?>" class="conversation-item">
+                            <div class="conversation-avatar">
+                                <?php if (!empty($conversation['profile_picture'])): ?>
+                                    <img src="uploads/profiles/<?php echo htmlspecialchars($conversation['profile_picture']); ?>" alt="Avatar">
+                                <?php else: ?>
+                                    <?php echo strtoupper(substr($conversation['first_name'], 0, 1)); ?>
+                                <?php endif; ?>
+                                
+                                <?php 
+                                $is_online = isset($conversation['last_active']) && 
+                                           (time() - strtotime($conversation['last_active']) < 300);
+                                if ($is_online): 
+                                ?>
+                                    <div class="online-indicator"></div>
+                                <?php endif; ?>
+                            </div>
+                            
+                            <div class="conversation-content">
+                                <div class="conversation-header">
+                                    <h4 class="conversation-name">
+                                        <?php echo htmlspecialchars($conversation['first_name'] . ' ' . $conversation['last_name']); ?>
+                                    </h4>
+                                    <span class="conversation-time">
+                                        <?php 
+                                        if ($conversation['last_message_time']) {
+                                            echo date('H:i', strtotime($conversation['last_message_time']));
+                                        }
+                                        ?>
+                                    </span>
+                                </div>
+                                <p class="conversation-preview">
+                                    <?php echo htmlspecialchars($conversation['last_message'] ?? 'Démarrer une conversation...'); ?>
+                                </p>
+                            </div>
+                            
+                            <?php if ($conversation['unread_count'] > 0): ?>
+                                <span class="unread-badge"><?php echo $conversation['unread_count']; ?></span>
+                            <?php endif; ?>
+                        </a>
+                    <?php endforeach; ?>
+                </div>
+            <?php endif; ?>
+        </div>
+
+        <!-- Section suggestions -->
+        <div class="suggestions-section">
+            <div class="section-header">
+                <h3 class="section-title">Suggestions</h3>
+            </div>
+
+            <?php if (empty($suggested_users)): ?>
+                <div class="empty-state">
+                    <i class="fas fa-user-plus"></i>
+                    <h4>Aucune suggestion</h4>
+                    <p>Découvrez de nouveaux profils pour voir des suggestions ici.</p>
+                </div>
+            <?php else: ?>
+                <div class="suggestions-list">
+                    <?php foreach ($suggested_users as $user): ?>
+                        <div class="suggestion-item">
+                            <div class="suggestion-avatar">
+                                <?php if (!empty($user['profile_picture'])): ?>
+                                    <img src="uploads/profiles/<?php echo htmlspecialchars($user['profile_picture']); ?>" alt="Avatar">
+                                <?php else: ?>
+                                    <?php echo strtoupper(substr($user['first_name'], 0, 1)); ?>
+                                <?php endif; ?>
+                            </div>
+                            
+                            <div class="suggestion-info">
+                                <h5 class="suggestion-name">
+                                    <?php echo htmlspecialchars($user['first_name'] . ' ' . $user['last_name']); ?>
+                                </h5>
+                                <p class="suggestion-status">Nouveau match potentiel</p>
+                            </div>
+                            
+                            <button class="start-chat-btn" onclick="startChat(<?php echo $user['id']; ?>)">
+                                <i class="fas fa-comment"></i>
+                            </button>
+                        </div>
+                    <?php endforeach; ?>
                 </div>
             <?php endif; ?>
         </div>
     </div>
 
-    <!-- Modal de recherche -->
-    <div class="search-modal" id="searchModal">
-        <div class="search-content">
-            <h3 style="margin-bottom: 20px;">Rechercher des utilisateurs</h3>
-            <input type="text" class="search-input" id="searchInput" placeholder="Rechercher par nom..." oninput="searchUsers()">
-            <div class="search-results" id="searchResults"></div>
-            <button onclick="closeSearchModal()" style="margin-top: 20px; padding: 10px 20px; background: var(--text-secondary); color: white; border: none; border-radius: 8px; cursor: pointer;">
-                Fermer
-            </button>
+    <!-- Modal nouvelle conversation -->
+    <div class="modal" id="newMessageModal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3 class="modal-title">Nouvelle conversation</h3>
+                <button class="close-btn" onclick="closeNewMessageModal()">×</button>
+            </div>
+            
+            <div class="suggestions-list">
+                <?php foreach ($suggested_users as $user): ?>
+                    <div class="suggestion-item" onclick="startChat(<?php echo $user['id']; ?>)">
+                        <div class="suggestion-avatar">
+                            <?php if (!empty($user['profile_picture'])): ?>
+                                <img src="uploads/profiles/<?php echo htmlspecialchars($user['profile_picture']); ?>" alt="Avatar">
+                            <?php else: ?>
+                                <?php echo strtoupper(substr($user['first_name'], 0, 1)); ?>
+                            <?php endif; ?>
+                        </div>
+                        
+                        <div class="suggestion-info">
+                            <h5 class="suggestion-name">
+                                <?php echo htmlspecialchars($user['first_name'] . ' ' . $user['last_name']); ?>
+                            </h5>
+                            <p class="suggestion-status">Cliquez pour démarrer une conversation</p>
+                        </div>
+                    </div>
+                <?php endforeach; ?>
+            </div>
         </div>
     </div>
 
     <script>
-        function openChat(userId) {
-            window.location.href = `messages.php?chat=${userId}`;
-        }
-
-        function sendMessage() {
-            const input = document.getElementById('messageInput');
-            const message = input.value.trim();
+        // Recherche en temps réel
+        document.getElementById('searchInput').addEventListener('input', function() {
+            const searchTerm = this.value.toLowerCase();
+            const conversations = document.querySelectorAll('.conversation-item');
             
-            if (!message) {
-                alert('Veuillez saisir un message');
-                return;
-            }
-            
-            const chatUserId = <?php echo $active_chat ?: 'null'; ?>;
-            if (!chatUserId) {
-                alert('Aucune conversation sélectionnée');
-                return;
-            }
-            
-            // Désactiver le bouton d'envoi
-            const sendBtn = document.querySelector('.send-btn');
-            sendBtn.disabled = true;
-            sendBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i>';
-            
-            fetch('send_message.php', {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                },
-                body: JSON.stringify({
-                    to_user_id: chatUserId,
-                    message: message
-                })
-            })
-            .then(response => response.json())
-            .then(data => {
-                console.log('Réponse du serveur:', data); // Debug
+            conversations.forEach(conv => {
+                const name = conv.querySelector('.conversation-name').textContent.toLowerCase();
+                const preview = conv.querySelector('.conversation-preview').textContent.toLowerCase();
                 
-                if (data.success) {
-                    input.value = '';
-                    addMessageToChat(message, true);
-                    scrollToBottom();
+                if (name.includes(searchTerm) || preview.includes(searchTerm)) {
+                    conv.style.display = 'flex';
                 } else {
-                    alert('Erreur: ' + (data.error || 'Impossible d\'envoyer le message'));
+                    conv.style.display = 'none';
                 }
-            })
-            .catch(error => {
-                console.error('Erreur:', error);
-                alert('Erreur de connexion. Veuillez réessayer.');
-            })
-            .finally(() => {
-                // Réactiver le bouton
-                sendBtn.disabled = false;
-                sendBtn.innerHTML = '<i class="fas fa-paper-plane"></i>';
             });
+        });
+
+        // Modal nouvelle conversation
+        function openNewMessageModal() {
+            document.getElementById('newMessageModal').style.display = 'block';
         }
 
-        function handleKeyPress(event) {
-            if (event.key === 'Enter' && !event.shiftKey) {
-                event.preventDefault();
-                sendMessage();
+        function closeNewMessageModal() {
+            document.getElementById('newMessageModal').style.display = 'none';
+        }
+
+        // Démarrer une conversation
+        function startChat(userId) {
+            window.location.href = `chat.php?user_id=${userId}`;
+        }
+
+        // Fermer le modal en cliquant à l'extérieur
+        window.onclick = function(event) {
+            const modal = document.getElementById('newMessageModal');
+            if (event.target === modal) {
+                closeNewMessageModal();
             }
-        }
+        }    </script>
 
-        function addMessageToChat(message, isSent) {
-            const messagesArea = document.getElementById('messagesArea');
-            const messageDiv = document.createElement('div');
-            messageDiv.className = `message ${isSent ? 'sent' : 'received'}`;
-            messageDiv.innerHTML = `
-                <div class="message-content">
-                    ${message.replace(/\n/g, '<br>')}
-                    <div class="message-time">
-                        ${new Date().toLocaleTimeString('fr-FR', {hour: '2-digit', minute: '2-digit'})}
-                    </div>
-                </div>
-            `;
-            messagesArea.appendChild(messageDiv);
-        }
-
-        function scrollToBottom() {
-            const messagesArea = document.getElementById('messagesArea');
-            messagesArea.scrollTop = messagesArea.scrollHeight;
-        }
-
-        function openSearchModal() {
-            document.getElementById('searchModal').style.display = 'flex';
-        }
-
-        function closeSearchModal() {
-            document.getElementById('searchModal').style.display = 'none';
-        }
-
-        function searchUsers() {
-            const searchTerm = document.getElementById('searchInput').value.trim();
-            
-            if (searchTerm.length < 2) {
-                document.getElementById('searchResults').innerHTML = '';
-                return;
-            }
-            
-            fetch('search_users.php', {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                },
-                body: JSON.stringify({
-                    search: searchTerm
-                })
-            })
-            .then(response => response.json())
-            .then(data => {
-                displaySearchResults(data.users || []);
-            })
-            .catch(error => console.error('Erreur:', error));
-        }
-
-        function displaySearchResults(users) {
-            const resultsDiv = document.getElementById('searchResults');
-            
-            if (users.length === 0) {
-                resultsDiv.innerHTML = '<p style="text-align: center; color: var(--text-secondary); padding: 20px;">Aucun utilisateur trouvé</p>';
-                return;
-            }
-            
-            resultsDiv.innerHTML = users.map(user => `
-                <div class="search-result-item" onclick="startConversation(${user.id})">
-                    <div class="conversation-avatar">
-                        ${user.profile_picture 
-                            ? `<img src="uploads/profiles/${user.profile_picture}" alt="">`
-                            : user.first_name.charAt(0).toUpperCase()
-                        }
-                    </div>
-                    <div>
-                        <div style="font-weight: 600;">${user.first_name} ${user.last_name}</div>
-                        <div style="color: var(--text-secondary); font-size: 0.9rem;">${user.location || ''}</div>
-                    </div>
-                    ${user.is_premium ? '<div style="margin-left: auto; color: gold;"><i class="fas fa-crown"></i></div>' : ''}
-                </div>
-            `).join('');
-        }
-
-        function startConversation(userId) {
-            closeSearchModal();
-            openChat(userId);
-        }
-
-        // Auto-scroll au chargement
-        if (document.getElementById('messagesArea')) {
-            scrollToBottom();
-        }
-    </script>
+    <?php include 'includes/footer.php'; ?>
 </body>
 </html>

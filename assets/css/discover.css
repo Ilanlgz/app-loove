@@ -1,0 +1,157 @@
+/* Styles pour la page discover.php */
+
+.discover-container {
+    max-width: 600px;
+    margin: 20px auto;
+    padding: 20px;
+}
+
+.user-card {
+    background: white;
+    border-radius: 12px;
+    box-shadow: 0 4px 15px rgba(0,0,0,0.1);
+    overflow: hidden;
+    margin-bottom: 20px;
+    position: relative;
+    transition: transform 0.3s ease, opacity 0.3s ease;
+}
+
+.user-card.hidden {
+    display: none;
+}
+
+.user-card.active {
+    display: block;
+}
+
+.user-card.swiped-left {
+    transform: translateX(-150%) rotate(-20deg);
+    opacity: 0;
+}
+
+.user-card.swiped-right {
+    transform: translateX(150%) rotate(20deg);
+    opacity: 0;
+}
+
+.user-header {
+    padding: 15px;
+    display: flex;
+    justify-content: space-between;
+    border-bottom: 1px solid #f1f1f1;
+}
+
+.user-status {
+    font-size: 14px;
+    color: #999;
+    display: flex;
+    align-items: center;
+}
+
+.user-status::before {
+    content: '';
+    display: inline-block;
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    margin-right: 5px;
+    background: #ccc;
+}
+
+.user-status.online::before {
+    background: #4CAF50;
+}
+
+.user-card .user-info {
+    padding: 15px;
+}
+
+.user-card .user-info h2 {
+    margin: 0 0 10px 0;
+    font-size: 22px;
+}
+
+.location {
+    margin: 0;
+    color: #666;
+    display: flex;
+    align-items: center;
+}
+
+.location i {
+    color: #FF4458;
+    margin-right: 5px;
+}
+
+.user-bio {
+    padding: 0 15px 15px;
+    color: #333;
+    line-height: 1.5;
+}
+
+.user-actions {
+    display: flex;
+    justify-content: space-around;
+    padding: 15px;
+    border-top: 1px solid #f1f1f1;
+}
+
+.action-button {
+    width: 60px;
+    height: 60px;
+    border-radius: 50%;
+    border: none;
+    font-size: 24px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    transition: transform 0.2s ease, box-shadow 0.2s ease;
+    text-decoration: none;
+}
+
+.action-button:hover {
+    transform: scale(1.1);
+    box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+}
+
+.action-button.dislike {
+    background: white;
+    color: #FF4458;
+    border: 1px solid #FF4458;
+}
+
+.action-button.like {
+    background: #FF4458;
+    color: white;
+}
+
+.no-more-users {
+    text-align: center;
+    padding: 40px 20px;
+    background: white;
+    border-radius: 12px;
+    box-shadow: 0 4px 15px rgba(0,0,0,0.1);
+}
+
+.no-more-users i {
+    font-size: 60px;
+    color: #FF4458;
+    margin-bottom: 20px;
+}
+
+.no-more-users h2 {
+    margin: 0 0 15px;
+    color: #333;
+}
+
+.no-more-users p {
+    color: #666;
+
+    margin: 0 0 15px;
+    color: #333;
+}
+
+.no-more-users p {
+    color: #666;
+}

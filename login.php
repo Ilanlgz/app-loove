@@ -1,9 +1,61 @@
 <?php
-session_start();
+if (session_status() === PHP_SESSION_NONE) {
+    session_start();
+}
 
-// Si l'utilisateur est déjà connecté, rediriger vers l'accueil
-if(isset($_SESSION["loggedin"]) && $_SESSION["loggedin"] === true){
-    header("location: accueil.php");
+// Traitement du formulaire en premier
+if ($_SERVER["REQUEST_METHOD"] == "POST") {
+    require_once 'config/database.php';
+    
+    $email = trim($_POST["email"]);
+    $password = trim($_POST["password"]);
+    
+    try {
+        $conn = getDbConnection();
+        $stmt = $conn->prepare("SELECT * FROM users WHERE email = ?");
+        $stmt->execute([$email]);
+        
+        if ($stmt->rowCount() == 1) {
+            $user = $stmt->fetch();
+            
+            if (password_verify($password, $user["password"])) {
+                $_SESSION["loggedin"] = true;
+                $_SESSION["user_id"] = $user["id"];
+                $_SESSION["first_name"] = $user["first_name"];
+                $_SESSION["last_name"] = $user["last_name"];
+                $_SESSION["email"] = $user["email"];
+                $_SESSION["role"] = $user["role"] ?? "user";
+                
+                if (isset($user["role"]) && $user["role"] === "admin") {
+                    header("location: admin/dashboard.php");
+                } else {
+                    header("location: main.php");
+                }
+                exit;
+            } else {
+                $_SESSION['login_error'] = "Mot de passe incorrect.";
+                header("location: login.php");
+                exit;
+            }
+        } else {
+            $_SESSION['login_error'] = "Aucun compte trouvé avec cet email.";
+            header("location: login.php");
+            exit;
+        }
+    } catch (PDOException $e) {
+        $_SESSION['login_error'] = "Erreur de connexion à la base de données.";
+        header("location: login.php");
+        exit;
+    }
+}
+
+// Si l'utilisateur est déjà connecté, le rediriger vers la page appropriée
+if (isset($_SESSION["loggedin"]) && $_SESSION["loggedin"] === true) {
+    if (isset($_SESSION["role"]) && $_SESSION["role"] === "admin") {
+        header("location: admin/dashboard.php");
+    } else {
+        header("location: main.php");
+    }
     exit;
 }
 
@@ -256,9 +308,7 @@ if($success_message) unset($_SESSION['success_message']);
                 <i class="fas fa-check-circle"></i>
                 <span><?php echo $_SESSION['success_message']; unset($_SESSION['success_message']); ?></span>
             </div>
-        <?php endif; ?>
-
-        <form action="process_login.php" method="POST">
+        <?php endif; ?>        <form method="POST" action="<?php echo htmlspecialchars($_SERVER["PHP_SELF"]); ?>">
             <div class="form-group">
                 <label class="form-label" for="email">Adresse email</label>
                 <input type="email" id="email" name="email" class="form-input" required placeholder="votre@email.com">
@@ -285,11 +335,23 @@ if($success_message) unset($_SESSION['success_message']);
 
         <div class="divider">
             <span>Nouveau sur Loove ?</span>
-        </div>
-
-        <div class="register-link">
+        </div>        <div class="register-link">
             <a href="register.php">Créer un compte gratuitement</a>
         </div>
     </div>
+
+    <script>
+        // Animation au chargement
+        document.addEventListener('DOMContentLoaded', function() {
+            const container = document.querySelector('.login-container');
+            container.style.opacity = '0';
+            container.style.transform = 'translateY(30px)';
+            
+            setTimeout(() => {
+                container.style.transition = 'all 0.6s ease';
+                container.style.opacity = '1';
+                container.style.transform = 'translateY(0)';
+            }, 100);
+        });    </script>
 </body>
 </html>

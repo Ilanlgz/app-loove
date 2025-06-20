@@ -19,15 +19,9 @@ class Message {
     }
 
     public function getUserConversations($user_id) {
-        $stmt = $this->db->prepare("SELECT CASE WHEN m.sender_id = ? THEN m.receiver_id ELSE m.sender_id END as other_user_id, u.first_name, u.last_name, u.profile_picture as other_user_picture, CONCAT(u.first_name, ' ', u.last_name) as other_user_name, m.content as last_message, m.sent_at as last_message_time FROM messages m JOIN users u ON (CASE WHEN m.sender_id = ? THEN m.receiver_id ELSE m.sender_id END = u.id) WHERE m.sender_id = ? OR m.receiver_id = ? GROUP BY other_user_id ORDER BY m.sent_at DESC");
+        $stmt = $this->db->prepare("SELECT CASE WHEN m.sender_id = ? THEN m.receiver_id ELSE m.sender_id END as other_user_id, u.first_name, u.last_name, u.profile_picture as other_user_picture, CONCAT(u.first_name, ' ', u.last_name) as other_user_name, m.content as last_message FROM messages m JOIN users u ON (CASE WHEN m.sender_id = ? THEN m.receiver_id ELSE m.sender_id END = u.id) WHERE m.sender_id = ? OR m.receiver_id = ? GROUP BY other_user_id ORDER BY m.sent_at DESC");
         $stmt->execute([$user_id, $user_id, $user_id, $user_id]);
         return $stmt->fetchAll(PDO::FETCH_ASSOC);
-    }
-
-    public function markAsRead($user_id, $sender_id) {
-        $query = "UPDATE messages SET is_read = 1 WHERE receiver_id = ? AND sender_id = ? AND is_read = 0";
-        $stmt = $this->db->prepare($query);
-        return $stmt->execute([$user_id, $sender_id]);
     }
 }
 ?>
