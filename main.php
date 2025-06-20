@@ -39,6 +39,8 @@ if($success_message) {
     <title>Loove - Page d'accueil</title>
     <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
     <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="assets/css/footer.css">
+    <link rel="stylesheet" href="assets/css/hearts-background.css">
     
     <style>
         :root {
@@ -54,98 +56,273 @@ if($success_message) {
             --premium-secondary: #FFA500;
         }
 
+        /* Reset complet pour éliminer toutes les marges */
         * {
             margin: 0;
             padding: 0;
             box-sizing: border-box;
         }
 
-        body {
-            font-family: 'Poppins', sans-serif;
-            background: var(--background);
-            color: var(--text-primary);
+        html, body {
+            margin: 0 !important;
+            padding: 0 !important;
+            height: 100%;
+            overflow-x: hidden;
         }
 
+        body {
+            font-family: 'Poppins', sans-serif;
+            background: linear-gradient(135deg, #FF4458 0%, #FF6B81 25%, #FD5068 50%, #FF8A95 75%, #FFB3C1 100%) !important;
+            min-height: 100vh;
+            position: relative;
+            overflow-x: hidden;
+        }
+
+        body::before {
+            content: '';
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: 
+                radial-gradient(circle at 20% 80%, rgba(255, 68, 88, 0.3) 0%, transparent 50%),
+                radial-gradient(circle at 80% 20%, rgba(255, 107, 129, 0.3) 0%, transparent 50%),
+                radial-gradient(circle at 40% 40%, rgba(253, 80, 104, 0.2) 0%, transparent 50%);
+            z-index: -1;
+            animation: floatingColors 20s ease-in-out infinite;
+        }        @keyframes floatingColors {
+            0%, 100% { 
+                background: 
+                    radial-gradient(circle at 20% 80%, rgba(255, 68, 88, 0.3) 0%, transparent 50%),
+                    radial-gradient(circle at 80% 20%, rgba(255, 107, 129, 0.3) 0%, transparent 50%),
+                    radial-gradient(circle at 40% 40%, rgba(253, 80, 104, 0.2) 0%, transparent 50%);
+            }
+            50% { 
+                background: 
+                    radial-gradient(circle at 70% 30%, rgba(255, 68, 88, 0.3) 0%, transparent 50%),
+                    radial-gradient(circle at 30% 70%, rgba(255, 107, 129, 0.3) 0%, transparent 50%),
+                    radial-gradient(circle at 60% 60%, rgba(253, 80, 104, 0.2) 0%, transparent 50%);
+            }
+        }
+
+        /* Cœurs flottants animés par-dessus */
+        .floating-hearts {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            pointer-events: none;
+            z-index: 1;
+            overflow: hidden;
+        }
+
+        .floating-heart {
+            position: absolute;
+            color: rgba(255, 255, 255, 0.6);
+            font-size: 20px;
+            animation: floatUp 8s infinite linear;
+            opacity: 0;
+        }
+
+        .floating-heart:nth-child(odd) {
+            color: rgba(255, 68, 88, 0.7);
+            animation-duration: 10s;
+        }
+
+        .floating-heart:nth-child(3n) {
+            color: rgba(255, 107, 129, 0.6);
+            animation-duration: 12s;
+            font-size: 16px;
+        }
+
+        .floating-heart:nth-child(4n) {
+            color: rgba(253, 80, 104, 0.5);
+            animation-duration: 9s;
+            font-size: 24px;
+        }
+
+        .floating-heart:nth-child(5n) {
+            color: rgba(255, 138, 149, 0.7);
+            animation-duration: 11s;
+            font-size: 18px;
+        }
+
+        @keyframes floatUp {
+            0% {
+                opacity: 0;
+                transform: translateY(100vh) rotate(0deg) scale(0);
+            }
+            10% {
+                opacity: 1;
+                transform: translateY(90vh) rotate(45deg) scale(1);
+            }
+            90% {
+                opacity: 1;
+                transform: translateY(10vh) rotate(315deg) scale(1);
+            }
+            100% {
+                opacity: 0;
+                transform: translateY(-10vh) rotate(360deg) scale(0);
+            }
+        }
+
+        @keyframes heartPulse {
+            0%, 100% {
+                transform: scale(1);
+            }
+            50% {
+                transform: scale(1.2);
+            }
+        }
+
+        /* Améliorer la transparence des cartes sur le nouveau fond */
+        .profile-card {
+            background: rgba(255, 255, 255, 0.95) !important;
+            backdrop-filter: blur(20px) !important;
+            border: 1px solid rgba(255, 255, 255, 0.2) !important;
+        }
+
+        /* Header unifié standardisé */
         .header {
-            background: var(--white);
-            padding: 20px;
-            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+            background: linear-gradient(135deg, #FF4458, #FF6B81);
+            backdrop-filter: blur(20px);
+            border-bottom: 1px solid rgba(255, 255, 255, 0.2);
+            padding: 12px 0;
             position: sticky;
             top: 0;
-            z-index: 100;
+            z-index: 1000;
+            box-shadow: 0 2px 20px rgba(0, 0, 0, 0.1);
         }
 
         .nav-container {
-            max-width: 1200px;
+            max-width: 1400px;
             margin: 0 auto;
+            padding: 0 24px;
             display: flex;
             justify-content: space-between;
             align-items: center;
         }
 
         .logo {
-            font-size: 1.8rem;
+            font-size: 22px;
             font-weight: 700;
-            color: var(--primary-color);
+            color: white;
+            letter-spacing: 0.5px;
+            display: flex;
+            align-items: center;
+            text-decoration: none;
+            transition: opacity 0.3s ease;
+        }
+
+        .logo:hover {
+            opacity: 0.8;
+        }
+
+        .logo i {
+            margin-right: 6px;
+            font-size: 20px;
         }
 
         .nav-menu {
             display: flex;
-            gap: 30px;
             align-items: center;
+            gap: 8px;
         }
 
         .nav-link {
-            color: var(--text-primary);
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            padding: 8px 16px;
+            color: rgba(255, 255, 255, 0.9);
             text-decoration: none;
-            font-weight: 500;
-            padding: 10px 15px;
             border-radius: 8px;
+            font-weight: 500;
             transition: all 0.3s ease;
+            position: relative;
+            font-size: 14px;
         }
 
         .nav-link:hover {
-            color: var(--primary-color);
-            background: rgba(255, 68, 88, 0.1);
+            background: rgba(255, 255, 255, 0.15);
+            color: white;
+            transform: translateY(-2px);
+        }
+
+        .nav-link.active {
+            background: rgba(255, 255, 255, 0.25);
+            color: white;
+            box-shadow: 0 4px 12px rgba(255, 255, 255, 0.2);
+        }
+
+        .nav-link i {
+            font-size: 16px;
+            width: 16px;
+            text-align: center;
         }
 
         .user-info {
             display: flex;
             align-items: center;
-            gap: 15px;
+            gap: 12px;
+            margin-left: 20px;
+            padding-left: 20px;
+            border-left: 1px solid rgba(255, 255, 255, 0.3);
         }
 
         .user-avatar {
-            width: 40px;
-            height: 40px;
+            width: 32px;
+            height: 32px;
+            background: white;
             border-radius: 50%;
-            background: linear-gradient(135deg, var(--primary-color), var(--secondary-color));
             display: flex;
             align-items: center;
             justify-content: center;
-            color: var(--white);
+            color: #FF4458;
             font-weight: 600;
+            font-size: 14px;
+        }
+
+        .user-info span {
+            font-weight: 500;
+            color: white;
         }
 
         .btn-logout {
-            background: linear-gradient(135deg, var(--primary-color), var(--secondary-color));
-            color: var(--white);
-            padding: 10px 20px;
-            border: none;
-            border-radius: 8px;
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            padding: 6px 12px;
+            background: rgba(255, 255, 255, 0.15);
+            color: white;
             text-decoration: none;
-            font-weight: 600;
-            transition: transform 0.3s ease;
+            border-radius: 6px;
+            font-weight: 500;
+            transition: all 0.3s ease;
+            font-size: 13px;
         }
 
         .btn-logout:hover {
+            background: white;
+            color: #FF4458;
             transform: translateY(-2px);
+            box-shadow: 0 4px 12px rgba(255, 255, 255, 0.3);
         }
 
         .main-content {
             max-width: 1200px;
             margin: 0 auto;
-            padding: 40px 20px;
+           
+        }
+
+        .main-container {
+            /* Styles spécifiques pour la classe main-container */
+            margin: 20px auto 0; /* Garde seulement margin-top, supprime margin-bottom */
+            margin-top: 20px;
+            margin-bottom: 0 !important; /* Enlève complètement la marge en bas */
+            flex: 1; /* Prend tout l'espace disponible */
         }
 
         .success-alert {
@@ -223,6 +400,16 @@ if($success_message) {
         .feature-desc {
             color: var(--text-secondary);
             line-height: 1.6;
+        }
+
+        .feature-grid {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr); /* Force 3 colonnes égales */
+            gap: 24px;
+            margin-top: 32px;
+            max-width: 1000px; /* Limite la largeur pour un meilleur alignement */
+            margin-left: auto;
+            margin-right: auto;
         }
 
         /* Styles pour le CTA Premium */
@@ -306,6 +493,44 @@ if($success_message) {
             box-shadow: 0 8px 16px rgba(0,0,0,0.2);
         }
 
+        /* Footer collé aux bords */
+        .footer {
+            background: rgba(30, 41, 59, 0.9);
+            backdrop-filter: blur(20px);
+            color: white;
+            margin: 0;
+            margin-top: auto; /* Colle le footer en bas */
+            margin-bottom: 0;
+            padding: 0;
+            padding-bottom: 0 !important;
+            width: 100vw; /* Prend toute la largeur de l'écran */
+            position: relative;
+            left: 50%;
+            right: 50%;
+            margin-left: -50vw;
+            margin-right: -50vw;
+            margin-top: 0 !important; /* Supprime l'espace entre le contenu et le footer */
+        }
+
+        .footer-container {
+            max-width: 1400px;
+            margin: 0 auto;
+            padding: 10px 24px 0; /* Réduit de 40px à 10px pour enlever encore 30px */
+        }
+
+        .footer-bottom {
+            text-align: center;
+            padding-top: 20px;
+            padding-bottom: 0 !important; /* Supprime le padding en bas */
+            border-top: 1px solid rgba(148, 163, 184, 0.2);
+            margin-bottom: 0 !important;
+        }
+
+        .footer-bottom p {
+            color: #64748b;
+          
+        }
+
         @media (max-width: 768px) {
             .welcome-title { font-size: 2rem; }
             .nav-menu { gap: 15px; }
@@ -318,43 +543,30 @@ if($success_message) {
             .btn-premium {
                 margin-left: 0;
             }
+
+            .feature-grid {
+                grid-template-columns: 1fr; /* Une seule colonne sur mobile */
+                gap: 20px;
+            }
         }
     </style>
 </head>
 <body>
-    <header class="header">
-        <div class="nav-container">
-            <div class="logo">
-                <i class="fas fa-heart"></i> Loove
-            </div>
-            <nav class="nav-menu">
-                <a href="discover.php" class="nav-link">
-                    <i class="fas fa-users"></i> Découvrir
-                </a>
-                <a href="messages.php" class="nav-link">
-                    <i class="fas fa-comments"></i> Messages
-                </a>
-                <a href="profile.php" class="nav-link">
-                    <i class="fas fa-user"></i> Profil
-                </a>
-                <div class="user-info">
-                    <div class="user-avatar">
-                        <?php 
-                        if ($user['profile_picture']) {
-                            echo '<img src="uploads/profiles/' . htmlspecialchars($user['profile_picture']) . '" style="width: 100%; height: 100%; object-fit: cover; border-radius: 50%;">';
-                        } else {
-                            echo strtoupper(substr($_SESSION["first_name"], 0, 1));
-                        }
-                        ?>
-                    </div>
-                    <span>Bienvenue <?php echo htmlspecialchars($_SESSION["first_name"]); ?> !</span>
-                    <a href="logout.php" class="btn-logout">
-                        <i class="fas fa-sign-out-alt"></i> Déconnexion
-                    </a>
-                </div>
-            </nav>
-        </div>
-    </header>
+    <!-- Container des coeurs flottants -->
+    <div class="hearts-container">
+        <i class="fas fa-heart heart"></i>
+        <i class="fas fa-heart heart"></i>
+        <i class="fas fa-heart heart"></i>
+        <i class="fas fa-heart heart"></i>
+        <i class="fas fa-heart heart"></i>
+        <i class="fas fa-heart heart"></i>
+        <i class="fas fa-heart heart"></i>
+        <i class="fas fa-heart heart"></i>
+        <i class="fas fa-heart heart"></i>
+        <i class="fas fa-heart heart"></i>
+    </div>
+
+    <?php include 'includes/navbar.php'; ?>
 
     <main class="main-content">
         <?php if($success_message): ?>
@@ -373,22 +585,9 @@ if($success_message) {
                 <strong>Ton ID :</strong> <?php echo $_SESSION["user_id"]; ?> | 
                 <strong>Nom :</strong> <?php echo $_SESSION["first_name"]; ?>
             </div>
-            
-            <!-- Bouton de test notifications -->
-            <div style="margin-top: 20px;">
-                <a href="fix_database.php" style="background: rgba(255,255,255,0.15); color: white; padding: 10px 20px; border-radius: 8px; text-decoration: none; font-weight: 500; margin-right: 10px;">
-                    🔧 Réparer BDD
-                </a>
-                <a href="test_notification.php" style="background: rgba(255,255,255,0.2); color: white; padding: 10px 20px; border-radius: 8px; text-decoration: none; font-weight: 500; margin-right: 10px;">
-                    🧪 Tester les notifications push
-                </a>
-                <a href="simple_message_test.php" style="background: rgba(255,255,255,0.3); color: white; padding: 10px 20px; border-radius: 8px; text-decoration: none; font-weight: 500;">
-                    📲 Test Notifications Direct
-                </a>
-            </div>
         </section>
 
-        <div class="features">
+        <div class="features feature-grid">
             <div class="feature-card" onclick="window.location.href='discover.php'">
                 <div class="feature-icon">
                     <i class="fas fa-search"></i>
@@ -397,7 +596,7 @@ if($success_message) {
                 <p class="feature-desc">Rencontrez des personnes qui partagent vos passions près de chez vous</p>
             </div>
 
-            <div class="feature-card" onclick="window.location.href='matches.php'">
+            <div class="feature-card" onclick="window.location.href='messages.php'">
                 <div class="feature-icon">
                     <i class="fas fa-envelope"></i>
                 </div>
@@ -449,101 +648,96 @@ if($success_message) {
         </div>
         <?php endif; ?>
         
+            <?php include 'includes/footer.php'; ?>
+        
+
     </main>
 
-    <!-- NOTIFICATIONS LOOVE ACTIVÉES -->
-    <script>
-        console.log('🎯 LOOVE NOTIFICATIONS - Chargé');
-        
-        // Auto-initialisation des notifications push
-        let beamsClient;
-        
-        async function initPushNotifications() {
-            try {
-                if (typeof PusherPushNotifications !== 'undefined') {
-                    beamsClient = new PusherPushNotifications.Client({
-                        instanceId: '4bbe0180-fd1d-4834-84c3-128c682c923d',
-                    });
-                    
-                    await beamsClient.start();
-                    await beamsClient.addDeviceInterest('hello');
-                    await beamsClient.addDeviceInterest('user-<?php echo $_SESSION["user_id"]; ?>');
-                    
-                    console.log('✅ Notifications push activées pour <?php echo $_SESSION["first_name"]; ?>!');
-                    
-                    // Demander permission si nécessaire
-                    if (Notification.permission === 'default') {
-                        const permission = await Notification.requestPermission();
-                        if (permission === 'granted') {
-                            console.log('✅ Permission notifications accordée');
-                        }
-                    }
-                }
-            } catch (error) {
-                console.error('❌ Erreur init push:', error);
-            }
-        }
-        
-        // Fonction de test notification simple
-        function testSimple() {
-            console.log('🧪 Test notification...');
-            
-            if ('Notification' in window) {
-                if (Notification.permission === 'granted') {
-                    new Notification('🎉 Test Loove', {
-                        body: 'Salut <?php echo $_SESSION["first_name"]; ?>! Ça marche!',
-                        icon: 'https://cdn-icons-png.flaticon.com/512/2190/2190552.png'
-                    });
-                    console.log('✅ Notification envoyée!');
-                } else {
-                    Notification.requestPermission().then(permission => {
-                        if (permission === 'granted') {
-                            new Notification('🎉 Autorisé!', {
-                                body: 'Notifications OK pour <?php echo $_SESSION["first_name"]; ?>!',
-                                icon: 'https://cdn-icons-png.flaticon.com/512/2190/2190552.png'
-                            });
-                        }
-                    });
-                }
-            }
-        }
-        
-        window.testSimple = testSimple;
-        console.log('✅ Fonction testSimple() prête');
-        console.log('👤 Utilisateur: <?php echo $_SESSION["first_name"]; ?> (ID: <?php echo $_SESSION["user_id"]; ?>)');
-    </script>
-    
+    <!-- Scripts simplifiés -->
     <script src="https://js.pusher.com/beams/2.1.0/push-notifications-cdn.js"></script>
     <script>
-        console.log('🚀 Pusher SDK chargé');
-        
-        // Initialiser automatiquement les notifications
-        document.addEventListener('DOMContentLoaded', function() {
-            setTimeout(initPushNotifications, 500);
-        });
-        
-        function testPusher() {
-            console.log('🧪 Test Pusher...');
-            
-            if (typeof PusherPushNotifications !== 'undefined') {
-                const beamsClient = new PusherPushNotifications.Client({
-                    instanceId: '4bbe0180-fd1d-4834-84c3-128c682c923d',
-                });
-                
-                beamsClient.start()
-                    .then(() => beamsClient.addDeviceInterest('hello'))
-                    .then(() => beamsClient.addDeviceInterest('user-<?php echo $_SESSION["user_id"]; ?>'))
-                    .then(() => {
-                        console.log('✅ Pusher configuré!');
-                        console.log('📤 Commande cURL pour tester:');
-                        console.log('curl -H "Content-Type: application/json" -H "Authorization: Bearer 07255B4D6A282E46CB5CE36FAB1F71B1CE604D2ABC9F597334F5298AF755126A" -X POST "https://4bbe0180-fd1d-4834-84c3-128c682c923d.pushnotifications.pusher.com/publish_api/v1/instances/4bbe0180-fd1d-4834-84c3-128c682c923d/publishes" -d \'{"interests":["user-<?php echo $_SESSION["user_id"]; ?>"],"web":{"notification":{"title":"💕 Test <?php echo $_SESSION["first_name"]; ?>","body":"Message depuis cURL!"}}}\'');
-                    })
-                    .catch(console.error);
+        console.log('✅ Notifications Loove chargées');
+    </script>
+
+    <script>
+// Génération dynamique des cœurs flottants romantiques
+function createFloatingHearts() {
+    const heartsContainer = document.createElement('div');
+    heartsContainer.className = 'floating-hearts';
+    heartsContainer.id = 'floatingHearts';
+    heartsContainer.innerHTML = `
+        <i class="fas fa-heart floating-heart"></i>
+        <i class="fas fa-heart floating-heart"></i>
+        <i class="fas fa-heart floating-heart"></i>
+        <i class="fas fa-heart floating-heart"></i>
+        <i class="fas fa-heart floating-heart"></i>
+    `;
+    document.body.appendChild(heartsContainer);
+
+    // Créer des cœurs avec des positions et timings aléatoires
+    for (let i = 0; i < 15; i++) {
+        setTimeout(() => {
+            createHeart();
+        }, i * 800); // Délai entre chaque cœur
+    }
+
+    // Créer un nouveau cœur toutes les 3 secondes
+    setInterval(createHeart, 3000);
+}
+
+function createHeart() {
+    const heartsContainer = document.getElementById('floatingHearts');
+    if (!heartsContainer) return;
+
+    const heart = document.createElement('i');
+    heart.className = 'fas fa-heart floating-heart';
+    
+    // Position horizontale aléatoire
+    heart.style.left = Math.random() * 100 + '%';
+    
+    // Délai d'animation aléatoire
+    heart.style.animationDelay = Math.random() * 2 + 's';
+    
+    // Taille légèrement variable
+    const size = 16 + Math.random() * 12;
+    heart.style.fontSize = size + 'px';
+
+    // Couleurs aléatoires romantiques
+    const colors = [
+        'rgba(255, 68, 88, 0.7)',
+        'rgba(255, 107, 129, 0.6)', 
+        'rgba(253, 80, 104, 0.5)',
+        'rgba(255, 138, 149, 0.7)',
+        'rgba(255, 255, 255, 0.6)'
+    ];
+    heart.style.color = colors[Math.floor(Math.random() * colors.length)];
+
+    heartsContainer.appendChild(heart);
+
+    // Supprimer le cœur après l'animation
+    setTimeout(() => {
+        if (heart.parentNode) {
+            heart.parentNode.removeChild(heart);
+        }
+    }, 12000);
+}
+
+// Effet de pulsation sur les cœurs lors du hover des cartes
+document.addEventListener('DOMContentLoaded', function() {
+    createFloatingHearts();
+    
+    // Ajouter plus de cœurs lors du like d'un profil
+    document.addEventListener('click', function(e) {
+        if (e.target.closest('.like-btn') || e.target.closest('.swipe-like')) {
+            // Explosion de cœurs lors d'un like ! 💕
+            for (let i = 0; i < 5; i++) {
+                setTimeout(() => {
+                    createHeart();
+                }, i * 100);
             }
         }
-        
-        window.testPusher = testPusher;
-        console.log('✅ Fonction testPusher() prête');
-    </script>
+    });
+});
+</script>
 </body>
 </html>

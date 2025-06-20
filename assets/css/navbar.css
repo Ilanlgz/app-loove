@@ -1,0 +1,137 @@
+/* CSS optimisé pour la navbar */
+body, html {
+    margin: 0;
+    padding: 0;
+}
+
+.header {
+    background: linear-gradient(135deg, #FF4458, #FF6B81);
+    color: white;
+    padding: 0;
+    box-shadow: 0 4px 20px rgba(0,0,0,0.15);
+    position: sticky;
+    top: 0;
+    z-index: 1000;
+    margin: 0;
+    width: 100%;
+}
+
+.nav-container {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    width: 100%;
+    margin: 0;
+    padding: 10px 20px;
+    box-sizing: border-box;
+}
+
+.logo {
+    font-size: 28px;
+    font-weight: 700;
+    display: flex;
+    align-items: center;
+    letter-spacing: 1px;
+    color: white;
+    text-decoration: none;
+}
+
+.logo i {
+    margin-right: 12px;
+    color: white;
+}
+
+.nav-menu {
+    display: flex;
+    align-items: center;
+}
+
+.nav-link {
+    color: white;
+    text-decoration: none;
+    padding: 12px 20px;
+    margin: 0 8px;
+    border-radius: 10px;
+    transition: all 0.3s ease;
+    display: flex;
+    align-items: center;
+    font-weight: 600;
+    font-size: 16px;
+}
+
+.nav-link i {
+    margin-right: 10px;
+    font-size: 20px;
+}
+
+.nav-link:hover, .nav-link.active {
+    background-color: rgba(255, 255, 255, 0.3);
+    transform: translateY(-3px);
+    box-shadow: 0 5px 15px rgba(0,0,0,0.1);
+}
+
+.user-info {
+    display: flex;
+    align-items: center;
+    margin-left: 25px;
+    padding-left: 25px;
+    border-left: 2px solid rgba(255, 255, 255, 0.5);
+}
+
+.user-avatar {
+    width: 45px;
+    height: 45px;
+    background-color: white;
+    color: #FF4458;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-weight: 700;
+    margin-right: 15px;
+    box-shadow: 0 4px 15px rgba(0,0,0,0.15);
+    font-size: 20px;
+    border: 2px solid rgba(255,255,255,0.8);
+}
+
+.btn-logout {
+    color: white;
+    text-decoration: none;
+    padding: 12px 18px;
+    border-radius: 10px;
+    margin-left: 20px;
+    background-color: rgba(255, 255, 255, 0.25);
+    transition: all 0.3s ease;
+    font-weight: 600;
+    box-shadow: 0 4px 15px rgba(0,0,0,0.1);
+    border: 1px solid rgba(255,255,255,0.3);
+}
+
+.btn-logout:hover {
+    background-color: rgba(255, 255, 255, 0.4);
+    transform: translateY(-3px);
+    box-shadow: 0 6px 20px rgba(0,0,0,0.15);
+}
+
+/* Responsivité pour les mobiles */
+@media (max-width: 768px) {
+    .nav-menu {
+        flex-wrap: wrap;
+        justify-content: center;
+    }
+    
+    .user-info {
+        margin-top: 10px;
+        padding-left: 0;
+        border-left: none;
+        margin-left: 0;
+        width: 100%;
+        justify-content: center;
+    }
+    
+    .nav-link {
+        padding: 8px 12px;
+        margin: 5px;
+        font-size: 14px;
+    }
+}

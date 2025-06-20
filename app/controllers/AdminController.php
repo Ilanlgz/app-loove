@@ -73,6 +73,28 @@ class AdminController extends Controller {
         ]);
     }
     
+    public function broadcast() {
+        if ($_SERVER['REQUEST_METHOD'] === 'POST') {
+            $message = trim($_POST['message']);
+            $type = $_POST['type'] ?? 'info';
+            
+            if (!empty($message)) {
+                $conn = getDbConnection();
+                
+                // Enregistrer l'annonce en base
+                $stmt = $conn->prepare("INSERT INTO announcements (message, type, created_at) VALUES (?, ?, NOW())");
+                $stmt->execute([$message, $type]);
+                
+                // Ici vous pourriez ajouter l'envoi d'emails, notifications push, etc.
+                
+                $_SESSION['success'] = "Annonce envoyée avec succès !";
+                $this->redirect('/admin/broadcast.php');
+            }
+        }
+        
+        $this->view('admin/broadcast');
+    }
+    
     public function logout() {
         unset($_SESSION["admin_loggedin"]);
         unset($_SESSION["admin_id"]);

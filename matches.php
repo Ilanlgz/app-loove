@@ -1,191 +1,349 @@
 <?php
-session_start();
+if (session_status() === PHP_SESSION_NONE) {
+    session_start();
+}
 
-if(!isset($_SESSION["loggedin"]) || $_SESSION["loggedin"] !== true){
+if (!isset($_SESSION["loggedin"]) || $_SESSION["loggedin"] !== true) {
     header("location: login.php");
     exit;
 }
 
-// Créer les tables de messages si elles n'existent pas
 require_once 'config/database.php';
-try {
-    $conn = getDbConnection();
-    
-    // Table des conversations
-    $conversationsQuery = "CREATE TABLE IF NOT EXISTS conversations (
-        id INT AUTO_INCREMENT PRIMARY KEY,
-        user1_id INT NOT NULL,
-        user2_id INT NOT NULL,
-        last_message TEXT,
-        last_message_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-        INDEX idx_user1 (user1_id),
-        INDEX idx_user2 (user2_id),
-        UNIQUE KEY unique_conversation (user1_id, user2_id)
-    )";
-    
-    // Table des messages
-    $messagesQuery = "CREATE TABLE IF NOT EXISTS messages (
-        id INT AUTO_INCREMENT PRIMARY KEY,
-        conversation_id INT NOT NULL,
-        from_user_id INT NOT NULL,
-        to_user_id INT NOT NULL,
-        message_text TEXT NOT NULL,
-        sent_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-        is_read BOOLEAN DEFAULT FALSE,
-        INDEX idx_conversation (conversation_id),
-        INDEX idx_from_user (from_user_id),
-        INDEX idx_to_user (to_user_id)
-    )";
-    
-    $conn->exec($conversationsQuery);
-    $conn->exec($messagesQuery);
-    
-} catch (PDOException $e) {
-    // Ignorer les erreurs de création de tables
-}
-
 require_once 'classes/Match.php';
 
-$matchSystem = new MatchSystem();
-$user_matches = $matchSystem->getUserMatches($_SESSION["user_id"]);
-?>
+// Pour l'instant, on ignore les vrais matches et on affiche juste les utilisateurs réels
+$user_matches = []; // Pas de vrais matches pour l'instant
 
+// Récupérer les vrais utilisateurs du site pour la démo
+try {
+    $conn = getDbConnection();
+    $matchSystem = new MatchSystem();
+    $real_users = $matchSystem->getDiscoverUsers($_SESSION["user_id"], 6);
+    
+    // Si pas de résultats avec la classe, essayer directement
+    if (empty($real_users)) {
+        $stmt = $conn->prepare("
+            SELECT id, first_name, last_name, profile_picture, bio, email, created_at
+            FROM users 
+            WHERE id != ? 
+            AND (role IS NULL OR role != 'admin')
+            ORDER BY created_at DESC 
+            LIMIT 6
+        ");
+        $stmt->execute([$_SESSION["user_id"]]);
+        $real_users = $stmt->fetchAll(PDO::FETCH_ASSOC);
+    }
+
+    // Convertir les vrais utilisateurs en format "match" pour l'affichage
+    $demo_matches = [];
+    foreach ($real_users as $user) {
+        $demo_matches[] = [
+            'match_user_id' => $user['id'],
+            'match_first_name' => $user['first_name'],
+            'match_last_name' => $user['last_name'],
+            'match_profile_picture' => $user['profile_picture'],
+            'match_bio' => $user['bio'] ?: 'Utilisateur inscrit sur Loove - Découvrez son profil !',
+            'matched_at' => date('Y-m-d H:i:s', strtotime('-' . rand(1, 48) . ' hours')), // Date aléatoire récente
+            'is_demo' => true,
+            'is_real_user' => true
+        ];
+    }    // Mélanger les vrais matches avec les utilisateurs réels
+    $all_matches = array_merge($user_matches, $demo_matches);
+    
+    // Si vraiment aucun utilisateur, on ajoute des exemples pour la démo
+    if (empty($all_matches)) {
+        $demo_matches = [
+            [
+                'match_user_id' => 999,
+                'match_first_name' => 'Emma',
+                'match_last_name' => 'Martin',
+                'match_profile_picture' => '',
+                'match_bio' => 'Passionnée de voyage et de photographie. J\'adore découvrir de nouveaux endroits !',
+                'matched_at' => date('Y-m-d H:i:s', strtotime('-2 days')),
+                'is_demo' => true,
+                'is_real_user' => false
+            ],
+            [
+                'match_user_id' => 998,
+                'match_first_name' => 'Lucas',
+                'match_last_name' => 'Dubois',
+                'match_profile_picture' => '',
+                'match_bio' => 'Développeur passionné, amateur de cuisine et de musique.',
+                'matched_at' => date('Y-m-d H:i:s', strtotime('-1 day')),
+                'is_demo' => true,
+                'is_real_user' => false
+            ]
+        ];
+        $all_matches = $demo_matches;
+    }
+    
+    // Debug pour voir ce qui se passe
+    echo "<!-- DEBUG: ";
+    echo "Nombre d'utilisateurs trouvés: " . count($real_users) . " | ";
+    echo "Nombre de demo_matches: " . count($demo_matches) . " | ";
+    echo "Nombre d'all_matches: " . count($all_matches) . " | ";
+    echo "User ID actuel: " . $_SESSION["user_id"];
+    echo " -->";
+
+} catch (Exception $e) {
+    echo "<!-- ERREUR: " . $e->getMessage() . " -->";
+    error_log("Erreur dans matches.php: " . $e->getMessage());
+    $demo_matches = [];
+    $all_matches = [];
+}
+?>
 <!DOCTYPE html>
 <html lang="fr">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Mes Matches - Loove</title>
-    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">    <title>Mes Matches - Loove</title>
+    <link rel="stylesheet" href="assets/css/footer.css">
     <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
     <style>
-        :root {
-            --primary-color: #FF4458;
-            --secondary-color: #FD5068;
-            --text-primary: #2c2c2c;
-            --text-secondary: #8E8E93;
-            --background: #FAFAFA;
-            --white: #FFFFFF;
-            --success: #34C759;
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
         }
-
-        * { margin: 0; padding: 0; box-sizing: border-box; }
 
         body {
             font-family: 'Poppins', sans-serif;
-            background: var(--background);
-            color: var(--text-primary);
+            background: linear-gradient(135deg, #FF4458 0%, #FF6B81 25%, #FD5068 50%, #FF8A95 75%, #FFB3C1 100%);
+            min-height: 100vh;
+            position: relative;
+            overflow-x: hidden;
         }
 
+        body::before {
+            content: '';
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: 
+                radial-gradient(circle at 20% 80%, rgba(255, 68, 88, 0.3) 0%, transparent 50%),
+                radial-gradient(circle at 80% 20%, rgba(255, 107, 129, 0.3) 0%, transparent 50%),
+                radial-gradient(circle at 40% 40%, rgba(253, 80, 104, 0.2) 0%, transparent 50%);
+            z-index: -1;
+            animation: floatingColors 20s ease-in-out infinite;
+        }
+
+        @keyframes floatingColors {
+            0%, 100% { 
+                background: 
+                    radial-gradient(circle at 20% 80%, rgba(255, 68, 88, 0.3) 0%, transparent 50%),
+                    radial-gradient(circle at 80% 20%, rgba(255, 107, 129, 0.3) 0%, transparent 50%),
+                    radial-gradient(circle at 40% 40%, rgba(253, 80, 104, 0.2) 0%, transparent 50%);
+            }
+            50% { 
+                background: 
+                    radial-gradient(circle at 70% 30%, rgba(255, 68, 88, 0.3) 0%, transparent 50%),
+                    radial-gradient(circle at 30% 70%, rgba(255, 107, 129, 0.3) 0%, transparent 50%),
+                    radial-gradient(circle at 60% 60%, rgba(253, 80, 104, 0.2) 0%, transparent 50%);
+            }
+        }
+
+        /* Header unifié standardisé */
         .header {
-            background: var(--white);
-            padding: 20px;
-            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+            background: linear-gradient(135deg, #FF4458, #FF6B81);
+            backdrop-filter: blur(20px);
+            border-bottom: 1px solid rgba(255, 255, 255, 0.2);
+            padding: 12px 0;
             position: sticky;
             top: 0;
-            z-index: 100;
+            z-index: 1000;
+            box-shadow: 0 2px 20px rgba(0, 0, 0, 0.1);
         }
 
         .nav-container {
-            max-width: 1200px;
+            max-width: 1400px;
             margin: 0 auto;
+            padding: 0 24px;
             display: flex;
             justify-content: space-between;
             align-items: center;
         }
 
         .logo {
-            font-size: 1.8rem;
+            font-size: 22px;
             font-weight: 700;
-            color: var(--primary-color);
+            color: white;
+            letter-spacing: 0.5px;
+            display: flex;
+            align-items: center;
             text-decoration: none;
+            transition: opacity 0.3s ease;
+        }
+
+        .logo:hover {
+            opacity: 0.8;
+        }
+
+        .logo i {
+            margin-right: 6px;
+            font-size: 20px;
         }
 
         .nav-menu {
             display: flex;
-            gap: 30px;
             align-items: center;
+            gap: 8px;
         }
 
         .nav-link {
-            color: var(--text-primary);
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            padding: 8px 16px;
+            color: rgba(255, 255, 255, 0.9);
             text-decoration: none;
-            font-weight: 500;
-            padding: 10px 15px;
             border-radius: 8px;
+            font-weight: 500;
             transition: all 0.3s ease;
+            position: relative;
+            font-size: 14px;
         }
 
-        .nav-link:hover, .nav-link.active {
-            color: var(--primary-color);
-            background: rgba(255, 68, 88, 0.1);
+        .nav-link:hover {
+            background: rgba(255, 255, 255, 0.15);
+            color: white;
+            transform: translateY(-2px);
+        }
+
+        .nav-link.active {
+            background: rgba(255, 255, 255, 0.25);
+            color: white;
+            box-shadow: 0 4px 12px rgba(255, 255, 255, 0.2);
+        }
+
+        .nav-link i {
+            font-size: 16px;
+            width: 16px;
+            text-align: center;
+        }
+
+        .user-info {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            margin-left: 20px;
+            padding-left: 20px;
+            border-left: 1px solid rgba(255, 255, 255, 0.3);
+        }
+
+        .user-avatar {
+            width: 32px;
+            height: 32px;
+            background: white;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: #FF4458;
+            font-weight: 600;
+            font-size: 14px;
+        }
+
+        .user-info span {
+            font-weight: 500;
+            color: white;
         }
 
         .btn-logout {
-            background: linear-gradient(135deg, var(--primary-color), var(--secondary-color));
-            color: var(--white);
-            padding: 10px 20px;
-            border: none;
-            border-radius: 8px;
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            padding: 6px 12px;
+            background: rgba(255, 255, 255, 0.15);
+            color: white;
             text-decoration: none;
-            font-weight: 600;
+            border-radius: 6px;
+            font-weight: 500;
+            transition: all 0.3s ease;
+            font-size: 13px;
         }
 
-        .main-content {
+        .btn-logout:hover {
+            background: white;
+            color: #FF4458;
+            transform: translateY(-2px);
+            box-shadow: 0 4px 12px rgba(255, 255, 255, 0.3);
+        }
+
+        /* Responsive navbar */
+        @media (max-width: 768px) {
+            .nav-container {
+                padding: 0 16px;
+            }
+            
+            .user-info span {
+                display: none;
+            }
+            
+            .nav-link {
+                padding: 6px 12px;
+                font-size: 13px;
+            }
+        }
+
+        /* Contenu principal */
+        .matches-container {
             max-width: 1200px;
-            margin: 0 auto;
-            padding: 40px 20px;
+            margin: 40px auto;
+            padding: 24px;
         }
 
-        .page-title {
-            font-size: 2.5rem;
+        .matches-header {
+            background: rgba(255, 255, 255, 0.95);
+            backdrop-filter: blur(20px);
+            border-radius: 20px;
+            padding: 32px;
+            margin-bottom: 32px;
+            text-align: center;
+            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.1);
+            border: 1px solid rgba(255, 255, 255, 0.2);
+        }
+
+        .matches-title {
+            font-size: 32px;
             font-weight: 700;
-            text-align: center;
-            margin-bottom: 20px;
-            background: linear-gradient(135deg, var(--primary-color), var(--secondary-color));
-            -webkit-background-clip: text;
-            -webkit-text-fill-color: transparent;
-            background-clip: text;
+            color: #333;
+            margin-bottom: 8px;
         }
 
-        .page-subtitle {
-            text-align: center;
-            color: var(--text-secondary);
-            font-size: 1.1rem;
-            margin-bottom: 50px;
+        .matches-subtitle {
+            font-size: 18px;
+            color: #666;
         }
 
         .matches-grid {
             display: grid;
             grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
-            gap: 30px;
-            margin-top: 30px;
+            gap: 24px;
         }
 
         .match-card {
-            background: var(--white);
+            background: rgba(255, 255, 255, 0.95);
+            backdrop-filter: blur(20px);
             border-radius: 20px;
-            box-shadow: 0 8px 24px rgba(0,0,0,0.1);
-            overflow: hidden;
-            transition: all 0.3s ease;
-            cursor: pointer;
+            padding: 24px;
+            text-align: center;
+            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.1);
+            border: 1px solid rgba(255, 255, 255, 0.2);
+            transition: transform 0.3s ease;
         }
 
         .match-card:hover {
-            transform: translateY(-5px);
-            box-shadow: 0 16px 32px rgba(0,0,0,0.15);
-        }
-
-        .match-avatar {
-            height: 200px;
-            background: linear-gradient(135deg, var(--primary-color), var(--secondary-color));
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            color: var(--white);
-            font-size: 3rem;
-            font-weight: 600;
+            transform: translateY(-4px);
+        }        .match-avatar {
+            width: 100px;
+            height: 100px;
+            border-radius: 50%;
+            margin: 0 auto 16px;
+            box-shadow: 0 8px 24px rgba(255, 68, 88, 0.3);
+            overflow: hidden;
             position: relative;
         }
 
@@ -195,279 +353,215 @@ $user_matches = $matchSystem->getUserMatches($_SESSION["user_id"]);
             object-fit: cover;
         }
 
-        .match-badge {
-            position: absolute;
-            top: 15px;
-            right: 15px;
-            background: rgba(255, 255, 255, 0.9);
-            color: var(--primary-color);
-            padding: 8px 12px;
-            border-radius: 20px;
-            font-size: 0.8rem;
-            font-weight: 600;
-            backdrop-filter: blur(10px);
+        .match-avatar .default-avatar {
+            width: 100%;
+            height: 100%;
+            background: linear-gradient(135deg, #FF4458, #FF6B81);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: white;
+            font-size: 36px;
+            font-weight: 700;
         }
 
-        .match-info {
-            padding: 25px;
+        .match-badge {
+            position: absolute;
+            top: -5px;
+            right: -5px;
+            background: #FF4458;
+            color: white;
+            width: 24px;
+            height: 24px;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 12px;
+            font-weight: 600;
+            box-shadow: 0 2px 8px rgba(255, 68, 88, 0.4);
         }
 
         .match-name {
-            font-size: 1.3rem;
+            font-size: 20px;
             font-weight: 600;
+            color: #333;
             margin-bottom: 8px;
-            display: flex;
-            align-items: center;
-            gap: 8px;
         }
 
-        .match-date {
-            color: var(--text-secondary);
-            font-size: 0.9rem;
-            margin-bottom: 20px;
+        .match-info {
+            color: #666;
+            font-size: 14px;
+            margin-bottom: 16px;
         }
 
         .match-actions {
             display: flex;
-            gap: 15px;
+            gap: 12px;
+            justify-content: center;
         }
 
         .btn-message {
-            flex: 1;
-            background: linear-gradient(135deg, var(--primary-color), var(--secondary-color));
-            color: var(--white);
-            padding: 12px 20px;
-            border: none;
-            border-radius: 12px;
-            font-weight: 600;
-            cursor: pointer;
-            transition: all 0.3s ease;
+            background: linear-gradient(135deg, #FF4458, #FF6B81);
+            color: white;
+            padding: 8px 16px;
+            border-radius: 8px;
+            text-decoration: none;
+            font-weight: 500;
+            font-size: 14px;
+            transition: transform 0.3s ease;
             display: flex;
             align-items: center;
-            justify-content: center;
-            gap: 8px;
+            gap: 6px;
         }
 
         .btn-message:hover {
             transform: translateY(-2px);
-            box-shadow: 0 8px 16px rgba(255, 68, 88, 0.3);
+            box-shadow: 0 4px 12px rgba(255, 68, 88, 0.3);
         }
 
-        .btn-profile {
-            background: var(--white);
-            color: var(--text-primary);
-            padding: 12px 15px;
-            border: 2px solid var(--text-secondary);
-            border-radius: 12px;
-            cursor: pointer;
-            transition: all 0.3s ease;
-        }
-
-        .btn-profile:hover {
-            border-color: var(--primary-color);
-            color: var(--primary-color);
-        }
-
-        .no-matches {
+        .empty-state {
+            background: rgba(255, 255, 255, 0.95);
+            backdrop-filter: blur(20px);
+            border-radius: 20px;
+            padding: 60px 40px;
             text-align: center;
-            padding: 100px 20px;
-            color: var(--text-secondary);
+            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.1);
+            border: 1px solid rgba(255, 255, 255, 0.2);
         }
 
-        .no-matches i {
-            font-size: 5rem;
-            margin-bottom: 30px;
-            color: var(--primary-color);
-            opacity: 0.5;
+        .empty-icon {
+            font-size: 64px;
+            color: #FF4458;
+            margin-bottom: 24px;
         }
 
-        .no-matches h2 {
-            font-size: 2rem;
-            margin-bottom: 15px;
-            color: var(--text-primary);
+        .empty-title {
+            font-size: 24px;
+            font-weight: 600;
+            color: #333;
+            margin-bottom: 12px;
         }
 
-        .no-matches p {
-            font-size: 1.1rem;
-            margin-bottom: 30px;
-            line-height: 1.6;
+        .empty-desc {
+            color: #666;
+            font-size: 16px;
+            margin-bottom: 24px;
         }
 
         .btn-discover {
-            background: linear-gradient(135deg, var(--primary-color), var(--secondary-color));
-            color: var(--white);
-            padding: 15px 30px;
-            border: none;
+            background: linear-gradient(135deg, #FF4458, #FF6B81);
+            color: white;
+            padding: 12px 24px;
             border-radius: 12px;
-            font-weight: 600;
-            cursor: pointer;
             text-decoration: none;
+            font-weight: 600;
             display: inline-flex;
             align-items: center;
-            gap: 10px;
-            transition: all 0.3s ease;
+            gap: 8px;
+            transition: transform 0.3s ease;
         }
 
         .btn-discover:hover {
             transform: translateY(-2px);
-            box-shadow: 0 8px 16px rgba(255, 68, 88, 0.3);
-        }
-
-        .stats-banner {
-            background: linear-gradient(135deg, var(--primary-color), var(--secondary-color));
-            color: var(--white);
-            padding: 30px;
-            border-radius: 20px;
-            text-align: center;
-            margin-bottom: 40px;
-        }
-
-        .stats-number {
-            font-size: 3rem;
-            font-weight: 700;
-            display: block;
-        }
-
-        .stats-label {
-            font-size: 1.1rem;
-            opacity: 0.9;
-        }
-
-        @media (max-width: 768px) {
-            .matches-grid {
-                grid-template-columns: 1fr;
-                gap: 20px;
-            }
-            
-            .page-title {
-                font-size: 2rem;
-            }
-            
-            .match-actions {
-                flex-direction: column;
-            }
+            box-shadow: 0 8px 24px rgba(255, 68, 88, 0.3);
         }
     </style>
 </head>
 <body>
-    <header class="header">
-        <div class="nav-container">
-            <a href="main.php" class="logo">
-                <i class="fas fa-heart"></i> Loove
-            </a>
-            <nav class="nav-menu">
-                <a href="discover.php" class="nav-link">
-                    <i class="fas fa-search"></i> Découvrir
-                </a>
-                <a href="matches.php" class="nav-link active">
-                    <i class="fas fa-heart"></i> Matches
-                </a>
-                <a href="messages.php" class="nav-link">
-                    <i class="fas fa-comments"></i> Messages
-                </a>
-                <a href="profile.php" class="nav-link">
-                    <i class="fas fa-user"></i> Profil
-                </a>
-                <a href="logout.php" class="btn-logout">
-                    <i class="fas fa-sign-out-alt"></i> Déconnexion
-                </a>
-            </nav>
-        </div>
-    </header>
+    <?php include 'includes/navbar.php'; ?>
 
-    <main class="main-content">
-        <h1 class="page-title">💕 Mes Matches</h1>
-        <p class="page-subtitle">Les personnes qui vous ont plu mutuellement</p>
-
-        <?php if (!empty($user_matches)): ?>
-            <div class="stats-banner">
-                <span class="stats-number"><?php echo count($user_matches); ?></span>
-                <span class="stats-label">Match<?php echo count($user_matches) > 1 ? 's' : ''; ?> trouvé<?php echo count($user_matches) > 1 ? 's' : ''; ?></span>
-            </div>
-
-            <div class="matches-grid">
-                <?php foreach ($user_matches as $match): ?>
-                    <div class="match-card" onclick="openProfile(<?php echo $match['match_id']; ?>)">
-                        <div class="match-avatar">
-                            <?php if ($match['match_picture']): ?>
-                                <img src="uploads/profiles/<?php echo htmlspecialchars($match['match_picture']); ?>" alt="<?php echo htmlspecialchars($match['match_name']); ?>">
-                            <?php else: ?>
-                                <?php echo strtoupper(substr($match['match_name'], 0, 1)); ?>
-                            <?php endif; ?>
-                            <div class="match-badge">
-                                <i class="fas fa-heart"></i> Match
-                            </div>
-                        </div>
-                        <div class="match-info">
-                            <div class="match-name">
-                                <?php echo htmlspecialchars($match['match_name']); ?>
-                                <span style="font-size: 1.2rem;">💕</span>
-                            </div>
-                            <div class="match-date">
-                                Match du <?php echo date('d/m/Y à H:i', strtotime($match['matched_at'])); ?>
-                            </div>
-                            <div class="match-actions">
-                                <button class="btn-message" onclick="event.stopPropagation(); startChat(<?php echo $match['match_id']; ?>)">
-                                    <i class="fas fa-comment"></i>
-                                    Discuter
-                                </button>
-                                <button class="btn-profile" onclick="event.stopPropagation(); viewProfile(<?php echo $match['match_id']; ?>)">
-                                    <i class="fas fa-user"></i>
-                                </button>
-                            </div>
-                        </div>
-                    </div>
-                <?php endforeach; ?>
-            </div>
-        <?php else: ?>
-            <div class="no-matches">
-                <i class="fas fa-heart-broken"></i>
-                <h2>Aucun match pour le moment</h2>
-                <p>Continuez à découvrir des profils pour trouver des personnes qui vous correspondent !</p>
+    <div class="matches-container">
+        <div class="matches-header">            <h1 class="matches-title">
+                <i class="fas fa-heart"></i>
+                Mes Matches
+            </h1>
+            <p class="matches-subtitle">
+                Découvrez vos compatibilités parfaites
+                <?php if (!empty($demo_matches)): ?>
+                    <br><span style="font-size: 14px; color: #FF4458; font-weight: 600;">
+                        🎓 Démo Oral : <?php echo count($demo_matches); ?> utilisateurs réels du site affichés
+                    </span>
+                <?php endif; ?>
+            </p>
+        </div>        <?php if (empty($all_matches)): ?>
+            <!-- État vide -->
+            <div class="empty-state">
+                <div class="empty-icon">
+                    <i class="fas fa-heart-broken"></i>
+                </div>
+                <h2 class="empty-title">Aucun match pour le moment</h2>
+                <p class="empty-desc">
+                    Commencez à swiper sur des profils pour créer vos premiers matches !<br>
+                    Plus vous êtes actif, plus vous avez de chances de trouver l'amour.
+                </p>
                 <a href="discover.php" class="btn-discover">
                     <i class="fas fa-search"></i>
                     Découvrir des profils
                 </a>
             </div>
-        <?php endif; ?>
-    </main>
+        <?php else: ?>
+            <!-- Grille des matches -->
+            <div class="matches-grid">
+                <?php foreach ($all_matches as $match): ?>
+                    <div class="match-card">
+                        <div class="match-avatar">
+                            <?php if (!empty($match['match_profile_picture'])): ?>
+                                <img src="uploads/profiles/<?php echo htmlspecialchars($match['match_profile_picture']); ?>" 
+                                     alt="<?php echo htmlspecialchars($match['match_first_name']); ?>">
+                            <?php else: ?>
+                                <div class="default-avatar">
+                                    <?php echo strtoupper(substr($match['match_first_name'], 0, 1)); ?>
+                                </div>
+                            <?php endif; ?>
+                            <div class="match-badge">
+                                <i class="fas fa-heart"></i>
+                            </div>
+                        </div>
+                          <h3 class="match-name">
+                            <?php echo htmlspecialchars($match['match_first_name'] . ' ' . $match['match_last_name']); ?>
+                            <?php if (isset($match['is_real_user']) && $match['is_real_user']): ?>
+                                <span style="font-size: 12px; color: #4CAF50; font-weight: 600;">✓ Utilisateur Réel</span>
+                            <?php elseif (isset($match['is_demo']) && $match['is_demo']): ?>
+                                <span style="font-size: 12px; color: #999; font-weight: 400;">(Démo)</span>
+                            <?php endif; ?>
+                        </h3>
+                        
+                        <p class="match-info">
+                            <?php 
+                            $match_date = new DateTime($match['matched_at']);
+                            echo "Match du " . $match_date->format('d/m/Y à H:i');
+                            ?>
+                        </p>
+                        
+                        <?php if (!empty($match['match_bio'])): ?>
+                            <p class="match-info">
+                                "<?php echo htmlspecialchars(substr($match['match_bio'], 0, 50)); ?><?php echo strlen($match['match_bio']) > 50 ? '...' : ''; ?>"
+                            </p>
+                        <?php endif; ?>
+                          <div class="match-actions">
+                            <?php if (isset($match['is_real_user']) && $match['is_real_user']): ?>
+                                <a href="messages.php?user_id=<?php echo $match['match_user_id']; ?>" class="btn-message">
+                                    <i class="fas fa-comment"></i>
+                                    Contacter cet utilisateur
+                                </a>
+                            <?php elseif (isset($match['is_demo']) && $match['is_demo']): ?>
+                                <a href="#" onclick="alert('Ceci est un profil de démonstration pour l\'oral !')" class="btn-message">
+                                    <i class="fas fa-comment"></i>
+                                    Envoyer un message
+                                </a>
+                            <?php else: ?>
+                                <a href="messages.php?user_id=<?php echo $match['match_user_id']; ?>" class="btn-message">
+                                    <i class="fas fa-comment"></i>
+                                    Envoyer un message
+                                </a>
+                            <?php endif; ?>
+                        </div>
+                    </div>
+                <?php endforeach; ?>
+            </div>        <?php endif; ?>
+    </div>
 
-    <script>
-        function startChat(userId) {
-            // Rediriger vers la messagerie avec cet utilisateur
-            window.location.href = `messages.php?chat=${userId}`;
-        }
-
-        function viewProfile(userId) {
-            // Ouvrir le profil en modal ou nouvelle page
-            alert(`Voir le profil de l'utilisateur ${userId} - Fonctionnalité en développement`);
-        }
-
-        function openProfile(userId) {
-            viewProfile(userId);
-        }
-
-        // Animation au scroll
-        const observerOptions = {
-            threshold: 0.1,
-            rootMargin: '0px 0px -50px 0px'
-        };
-
-        const observer = new IntersectionObserver((entries) => {
-            entries.forEach(entry => {
-                if (entry.isIntersecting) {
-                    entry.target.style.opacity = '1';
-                    entry.target.style.transform = 'translateY(0)';
-                }
-            });
-        }, observerOptions);
-
-        document.querySelectorAll('.match-card').forEach((card, index) => {
-            card.style.opacity = '0';
-            card.style.transform = 'translateY(30px)';
-            card.style.transition = `all 0.6s ease ${index * 0.1}s`;
-            observer.observe(card);
-        });
-    </script>
+    <?php include 'includes/footer.php'; ?>
 </body>
 </html>

@@ -1,4 +1,21 @@
 <?php
+
+// Autoloader simple pour les classes
+spl_autoload_register(function ($class) {
+    $paths = [
+        "../app/core/{$class}.php",
+        "../app/controllers/{$class}.php",
+        "../app/models/{$class}.php"
+    ];
+    
+    foreach ($paths as $path) {
+        if (file_exists($path)) {
+            require_once $path;
+            return;
+        }
+    }
+});
+
 class Router {
     public function handleRequest() {
         if (session_status() == PHP_SESSION_NONE) {
